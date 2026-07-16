@@ -1,21 +1,41 @@
 import Phaser from 'phaser'
 
-type WeaponType = 'rifle' | 'scattergun' | 'cannon' | 'photonLance'
+type WeaponType =
+  | 'rifle'
+  | 'scattergun'
+  | 'cannon'
+  | 'photonLance'
 
-type LootType = 'rifle' | 'scattergun' | 'cannon' | 'photonLance' | 'redbox'
+type LootType =
+  | 'rifle'
+  | 'scattergun'
+  | 'cannon'
+  | 'redbox'
 
 interface LootDrop {
   object: Phaser.GameObjects.Rectangle
   type: LootType
 }
 
+interface EncounterZone {
+  x: number
+  y: number
+  radius: number
+  enemyCount: number
+  triggered: boolean
+}
+
 class GameScene extends Phaser.Scene {
+  private readonly worldWidth = 2400
+  private readonly worldHeight = 1800
+
   private player!: Phaser.GameObjects.Rectangle
-  private lootDrops: LootDrop[] = []
-  
 
   private enemies: Phaser.GameObjects.Rectangle[] = []
-  private enemyHealth = new Map<Phaser.GameObjects.Rectangle, number>()
+  private enemyHealth = new Map<
+    Phaser.GameObjects.Rectangle,
+    number
+  >()
 
   private bullets: Phaser.GameObjects.Rectangle[] = []
   private bulletDirections = new Map<
@@ -23,10 +43,17 @@ class GameScene extends Phaser.Scene {
     Phaser.Math.Vector2
   >()
 
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
-  private wasd!: Record<string, Phaser.Input.Keyboard.Key>
+  private lootDrops: LootDrop[] = []
 
-  private enemySpawnTimer = 0
+  private encounterZones: EncounterZone[] = []
+
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+
+  private wasd!: Record<
+    string,
+    Phaser.Input.Keyboard.Key
+  >
+
   private fireTimer = 0
 
   private currentWeapon: WeaponType = 'rifle'
@@ -53,7 +80,7 @@ class GameScene extends Phaser.Scene {
   private playerDefense = 5
   private playerSpeed = 250
 
-
+  private xpBarBackground!: Phaser.GameObjects.Rectangle
   private xpBarFill!: Phaser.GameObjects.Rectangle
   private xpText!: Phaser.GameObjects.Text
 
@@ -62,7 +89,24 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    // Reset run state
+    this.resetRunState()
+
+    this.createWorld()
+
+    this.createPlayer()
+
+    this.setupCamera()
+
+    this.createHUD()
+
+    this.createCrosshair()
+
+    this.setupControls()
+
+    this.createEncounterZones()
+  }
+
+  private resetRunState() {
     this.playerHealth = 100
     this.maxPlayerHealth = 100
     this.playerDamageCooldown = 0
@@ -75,32 +119,125 @@ class GameScene extends Phaser.Scene {
     this.currentXP = 0
     this.xpToNextLevel = 10
 
-    this.lootDrops = []
-
     this.killCount = 0
     this.isGameOver = false
 
-    this.enemySpawnTimer = 0
     this.fireTimer = 0
 
     this.currentWeapon = 'rifle'
 
     this.enemies = []
     this.bullets = []
+    this.lootDrops = []
 
     this.enemyHealth.clear()
     this.bulletDirections.clear()
+  }
 
-    // Player
-    this.player = this.add.rectangle(
-      400,
+  private createWorld() {
+    // World background
+    this.add.rectangle(
+      this.worldWidth / 2,
+      this.worldHeight / 2,
+      this.worldWidth,
+      this.worldHeight,
+      0x111827
+    )
+
+    // Temporary landmarks / obstacles
+    // These are visual for now.
+    this.add.rectangle(
+      700,
+      450,
       300,
+      80,
+      0x263244
+    )
+
+    this.add.rectangle(
+      1200,
+      900,
+      100,
+      400,
+      0x263244
+    )
+
+    this.add.rectangle(
+      1800,
+      500,
+      350,
+      100,
+      0x263244
+    )
+
+    this.add.rectangle(
+      1750,
+      1350,
+      400,
+      80,
+      0x263244
+    )
+
+    this.add.rectangle(
+      700,
+      1350,
+      120,
+      350,
+      0x263244
+    )
+  }
+
+  private createPlayer() {
+    this.player = this.add.rectangle(
+      200,
+      200,
       32,
       32,
       0x00ff88
     )
+  }
 
-    // Weapon HUD
+  private setupCamera() {
+    this.cameras.main.setBounds(
+      0,
+      0,
+      this.worldWidth,
+      this.worldHeight
+    )
+
+    this.cameras.main.startFollow(
+      this.player,
+      true,
+      0.08,
+      0.08
+    )
+  }
+
+  private createHUD() {
+    this.killText = this.add
+      .text(
+        16,
+        16,
+        'Kills: 0',
+        {
+          fontSize: '24px',
+          color: '#ffffff',
+        }
+      )
+      .setScrollFactor(0)
+
+    this.healthText = this.add
+      .text(
+        16,
+        50,
+        'HP: 100 / 100',
+        {
+          fontSize: '24px',
+          color: '#ffffff',
+        }
+      )
+      .setScrollFactor(0)
+
     this.weaponText = this.add
       .text(
         784,
@@ -112,42 +249,17 @@ class GameScene extends Phaser.Scene {
         }
       )
       .setOrigin(1, 0)
+      .setScrollFactor(0)
 
-    // Crosshair
-    this.crosshair = this.add.circle(
-      0,
-      0,
-      8,
-      0xffffff,
-      0
-    )
-
-    this.crosshair.setStrokeStyle(
-      2,
-      0xffffff
-    )
-
-    // HUD
-    this.killText = this.add.text(
-      16,
-      16,
-      'Kills: 0',
-      {
-        fontSize: '24px',
-        color: '#ffffff',
-      }
-    )
-
-    this.healthText = this.add.text(
-      16,
-      50,
-      'HP: 100 / 100',
-      {
-        fontSize: '24px',
-        color: '#ffffff',
-      }
-    )
-
+    this.xpBarBackground = this.add
+      .rectangle(
+        400,
+        580,
+        300,
+        16,
+        0x333333
+      )
+      .setScrollFactor(0)
 
     this.xpBarFill = this.add
       .rectangle(
@@ -158,6 +270,7 @@ class GameScene extends Phaser.Scene {
         0x44aaff
       )
       .setOrigin(0, 0.5)
+      .setScrollFactor(0)
 
     this.xpText = this.add
       .text(
@@ -170,8 +283,25 @@ class GameScene extends Phaser.Scene {
         }
       )
       .setOrigin(0.5)
+      .setScrollFactor(0)
+  }
 
-    // Controls
+  private createCrosshair() {
+    this.crosshair = this.add.circle(
+      0,
+      0,
+      8,
+      0xffffff,
+      0
+    )
+
+    this.crosshair.setStrokeStyle(
+      2,
+      0xffffff
+    )
+  }
+
+  private setupControls() {
     this.cursors =
       this.input.keyboard!.createCursorKeys()
 
@@ -209,37 +339,85 @@ class GameScene extends Phaser.Scene {
     )
   }
 
-  update(_: number, delta: number) {
+  private createEncounterZones() {
+    this.encounterZones = [
+      {
+        x: 600,
+        y: 400,
+        radius: 220,
+        enemyCount: 8,
+        triggered: false,
+      },
+      {
+        x: 1200,
+        y: 400,
+        radius: 220,
+        enemyCount: 10,
+        triggered: false,
+      },
+      {
+        x: 1850,
+        y: 650,
+        radius: 250,
+        enemyCount: 12,
+        triggered: false,
+      },
+      {
+        x: 1400,
+        y: 1300,
+        radius: 250,
+        enemyCount: 14,
+        triggered: false,
+      },
+      {
+        x: 700,
+        y: 1400,
+        radius: 280,
+        enemyCount: 16,
+        triggered: false,
+      },
+    ]
+
+    // Temporary zone markers so we can test exploration.
+    for (const zone of this.encounterZones) {
+      this.add
+        .circle(
+          zone.x,
+          zone.y,
+          zone.radius,
+          0x334455,
+          0.08
+        )
+        .setStrokeStyle(
+          2,
+          0x445566,
+          0.35
+        )
+    }
+  }
+
+  update(
+    _: number,
+    delta: number
+  ) {
     if (this.isGameOver) {
       return
     }
 
-    const pointer =
-      this.input.activePointer
-
-    this.crosshair.setPosition(
-      pointer.worldX,
-      pointer.worldY
-    )
+    this.updateCrosshair()
 
     this.movePlayer(delta)
 
-    // Spawn enemies
-    this.enemySpawnTimer += delta
-
-    if (this.enemySpawnTimer >= 1000) {
-      this.spawnEnemy()
-      this.enemySpawnTimer = 0
-    }
+    this.checkEncounterZones()
 
     this.moveEnemies(delta)
 
     this.checkEnemyPlayerCollision(
       delta
     )
+
     this.checkLootCollection()
 
-    // Auto fire
     this.fireTimer += delta
 
     if (
@@ -247,247 +425,148 @@ class GameScene extends Phaser.Scene {
       this.getFireRate()
     ) {
       this.fireAtMouse()
+
       this.fireTimer = 0
     }
 
     this.moveBullets(delta)
   }
 
-  private checkLootCollection() {
-  if (
-    this.isGameOver ||
-    !this.player.active
-  ) {
-    return
+  private updateCrosshair() {
+    const pointer =
+      this.input.activePointer
+
+    this.crosshair.setPosition(
+      pointer.worldX,
+      pointer.worldY
+    )
   }
 
-  for (
-    let i =
-      this.lootDrops.length - 1;
-    i >= 0;
-    i--
-  ) {
-    const loot =
-      this.lootDrops[i]
+  private checkEncounterZones() {
+    for (
+      const zone of
+        this.encounterZones
+    ) {
+      if (zone.triggered) {
+        continue
+      }
 
-    if (!loot.object.active) {
-      continue
+      const distance =
+        Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          zone.x,
+          zone.y
+        )
+
+      if (
+        distance <=
+        zone.radius
+      ) {
+        zone.triggered = true
+
+        this.triggerEncounter(
+          zone
+        )
+      }
     }
+  }
 
-    const collected =
-      Phaser.Geom.Intersects.RectangleToRectangle(
-        this.player.getBounds(),
-        loot.object.getBounds()
+  private triggerEncounter(
+    zone: EncounterZone
+  ) {
+    this.showEncounterMessage(
+      'HOSTILES DETECTED'
+    )
+
+    for (
+      let i = 0;
+      i < zone.enemyCount;
+      i++
+    ) {
+      const angle =
+        Phaser.Math.FloatBetween(
+          0,
+          Math.PI * 2
+        )
+
+      const distance =
+        Phaser.Math.Between(
+          100,
+          zone.radius
+        )
+
+      const x =
+        zone.x +
+        Math.cos(angle) *
+          distance
+
+      const y =
+        zone.y +
+        Math.sin(angle) *
+          distance
+
+      this.spawnEnemyAt(
+        x,
+        y
       )
-
-    if (!collected) {
-      continue
     }
-
-    this.collectLoot(loot)
-
-    this.lootDrops.splice(
-      i,
-      1
-    )
-  }
-}
-
-private collectLoot(
-  loot: LootDrop
-) {
-  const type = loot.type
-
-  const beam =
-    loot.object.getData(
-      'beam'
-    ) as
-      | Phaser.GameObjects.Rectangle
-      | undefined
-
-  if (beam?.active) {
-    beam.destroy()
   }
 
-  loot.object.destroy()
-
-  if (
-    type === 'rifle' ||
-    type === 'scattergun' ||
-    type === 'cannon'
+  private showEncounterMessage(
+    message: string
   ) {
-    this.setWeapon(type)
-
-    this.showLootMessage(
-      `${type.toUpperCase()} EQUIPPED`
-    )
-
-    return
-  }
-
-  if (type === 'redbox') {
-    this.collectRedBox()
-  }
-}
-
-private collectRedBox() {
-  this.setWeapon(
-    'photonLance'
-  )
-
-  this.showRareLootMessage(
-    'PHOTON LANCE'
-  )
-}
-
-private showRareLootMessage(
-  weaponName: string
-) {
-  const rareText =
-    this.add
+    const text = this.add
       .text(
         400,
         100,
-        'RARE WEAPON',
+        message,
         {
-          fontSize: '20px',
+          fontSize: '28px',
           color: '#ff4444',
         }
       )
       .setOrigin(0.5)
+      .setScrollFactor(0)
 
-  const weaponText =
-    this.add
-      .text(
-        400,
-        135,
-        weaponName,
-        {
-          fontSize: '32px',
-          color: '#ffffff',
-        }
-      )
-      .setOrigin(0.5)
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      y: 70,
+      duration: 1200,
 
-  this.cameras.main.flash(
-    200,
-    255,
-    0,
-    0
-  )
-
-  this.tweens.add({
-    targets: [
-      rareText,
-      weaponText,
-    ],
-
-    alpha: 0,
-    y: '-=30',
-
-    delay: 800,
-    duration: 600,
-
-    onComplete: () => {
-      rareText.destroy()
-      weaponText.destroy()
-    },
-  })
-}
-
-private showLootMessage(
-  message: string
-) {
-  const text =
-    this.add
-      .text(
-        400,
-        120,
-        message,
-        {
-          fontSize: '24px',
-          color: '#ffffff',
-        }
-      )
-      .setOrigin(0.5)
-
-  this.tweens.add({
-    targets: text,
-    alpha: 0,
-    y: 90,
-    duration: 900,
-
-    onComplete: () => {
-      text.destroy()
-    },
-  })
-}
-
-private createRedBoxEffect(
-  redBox: Phaser.GameObjects.Rectangle
-) {
-  // Pulsing glow
-  this.tweens.add({
-    targets: redBox,
-    scale: 1.4,
-    alpha: 0.7,
-    duration: 400,
-    yoyo: true,
-    repeat: -1,
-  })
-
-  // Vertical beacon
-  const beam =
-    this.add.rectangle(
-      redBox.x,
-      redBox.y - 60,
-      6,
-      120,
-      0xff0000,
-      0.35
-    )
-
-  this.tweens.add({
-    targets: beam,
-    alpha: 0.1,
-    duration: 500,
-    yoyo: true,
-    repeat: -1,
-  })
-
-  // Keep the beam associated with the box
-  redBox.setData(
-    'beam',
-    beam
-  )
-
-  // Screen reaction
-  this.cameras.main.flash(
-    150,
-    255,
-    0,
-    0
-  )
-
-  this.cameras.main.shake(
-    150,
-    0.006
-  )
-}
-
-  private setWeapon(
-    weapon: WeaponType
-  ) {
-    this.currentWeapon = weapon
-
-    this.weaponText.setText(
-      weapon.toUpperCase()
-    )
-
-    this.fireTimer = 0
+      onComplete: () => {
+        text.destroy()
+      },
+    })
   }
 
-  private movePlayer(delta: number) {
+  private spawnEnemyAt(
+    x: number,
+    y: number
+  ) {
+    const enemy =
+      this.add.rectangle(
+        x,
+        y,
+        24,
+        24,
+        0xff4444
+      )
+
+    this.enemyHealth.set(
+      enemy,
+      3
+    )
+
+    this.enemies.push(
+      enemy
+    )
+  }
+
+  private movePlayer(
+    delta: number
+  ) {
     if (
       this.isGameOver ||
       !this.player.active
@@ -531,77 +610,15 @@ private createRedBoxEffect(
       Phaser.Math.Clamp(
         this.player.x,
         16,
-        784
+        this.worldWidth - 16
       )
 
     this.player.y =
       Phaser.Math.Clamp(
         this.player.y,
         16,
-        584
+        this.worldHeight - 16
       )
-  }
-
-  private spawnEnemy() {
-    if (this.isGameOver) {
-      return
-    }
-
-    const side =
-      Phaser.Math.Between(0, 3)
-
-    let x = 0
-    let y = 0
-
-    switch (side) {
-      case 0:
-        x = Phaser.Math.Between(
-          0,
-          800
-        )
-        y = 0
-        break
-
-      case 1:
-        x = 800
-        y = Phaser.Math.Between(
-          0,
-          600
-        )
-        break
-
-      case 2:
-        x = Phaser.Math.Between(
-          0,
-          800
-        )
-        y = 600
-        break
-
-      case 3:
-        x = 0
-        y = Phaser.Math.Between(
-          0,
-          600
-        )
-        break
-    }
-
-    const enemy =
-      this.add.rectangle(
-        x,
-        y,
-        24,
-        24,
-        0xff4444
-      )
-
-    this.enemyHealth.set(
-      enemy,
-      3
-    )
-
-    this.enemies.push(enemy)
   }
 
   private moveEnemies(
@@ -620,8 +637,27 @@ private createRedBoxEffect(
       enemySpeed *
       (delta / 1000)
 
-    for (const enemy of this.enemies) {
+    for (
+      const enemy of
+        this.enemies
+    ) {
       if (!enemy.active) {
+        continue
+      }
+
+      const distanceToPlayer =
+        Phaser.Math.Distance.Between(
+          enemy.x,
+          enemy.y,
+          this.player.x,
+          this.player.y
+        )
+
+      // Only chase once the player is reasonably nearby.
+      // This stops enemies from crossing the entire map.
+      if (
+        distanceToPlayer > 500
+      ) {
         continue
       }
 
@@ -660,7 +696,10 @@ private createRedBoxEffect(
         delta
     }
 
-    for (const enemy of this.enemies) {
+    for (
+      const enemy of
+        this.enemies
+    ) {
       if (!enemy.active) {
         continue
       }
@@ -675,7 +714,9 @@ private createRedBoxEffect(
         hit &&
         this.playerDamageCooldown <= 0
       ) {
-        this.damagePlayer(10)
+        this.damagePlayer(
+          10
+        )
 
         this.playerDamageCooldown =
           500
@@ -695,7 +736,8 @@ private createRedBoxEffect(
       return
     }
 
-    this.playerHealth -= amount
+    this.playerHealth -=
+      amount
 
     this.playerHealth =
       Math.max(
@@ -751,7 +793,9 @@ private createRedBoxEffect(
 
     this.input.keyboard?.resetKeys()
 
-    if (this.player.active) {
+    if (
+      this.player.active
+    ) {
       this.player.destroy()
     }
 
@@ -766,6 +810,7 @@ private createRedBoxEffect(
         }
       )
       .setOrigin(0.5)
+      .setScrollFactor(0)
 
     this.add
       .text(
@@ -778,6 +823,7 @@ private createRedBoxEffect(
         }
       )
       .setOrigin(0.5)
+      .setScrollFactor(0)
 
     const restartText =
       this.add
@@ -791,6 +837,7 @@ private createRedBoxEffect(
           }
         )
         .setOrigin(0.5)
+        .setScrollFactor(0)
         .setInteractive({
           useHandCursor: true,
         })
@@ -803,47 +850,75 @@ private createRedBoxEffect(
     )
   }
 
-  private fireAtMouse() {
-  if (
-    this.isGameOver ||
-    !this.player.active
+  private setWeapon(
+    weapon: WeaponType
   ) {
-    return
-  }
+    this.currentWeapon =
+      weapon
 
-  const pointer =
-    this.input.activePointer
-
-  const direction =
-    new Phaser.Math.Vector2(
-      pointer.worldX - this.player.x,
-      pointer.worldY - this.player.y
+    this.weaponText.setText(
+      weapon.toUpperCase()
     )
 
-  if (direction.length() === 0) {
-    return
+    this.fireTimer = 0
   }
 
-  direction.normalize()
+  private fireAtMouse() {
+    if (
+      this.isGameOver ||
+      !this.player.active
+    ) {
+      return
+    }
 
-  switch (this.currentWeapon) {
-    case 'rifle':
-      this.fireRifle(direction)
-      break
+    const pointer =
+      this.input.activePointer
 
-    case 'scattergun':
-      this.fireScattergun(direction)
-      break
+    const direction =
+      new Phaser.Math.Vector2(
+        pointer.worldX -
+          this.player.x,
 
-    case 'cannon':
-      this.fireCannon(direction)
-      break
+        pointer.worldY -
+          this.player.y
+      )
 
-    case 'photonLance':
-      this.firePhotonLance(direction)
-      break
+    if (
+      direction.length() === 0
+    ) {
+      return
+    }
+
+    direction.normalize()
+
+    switch (
+      this.currentWeapon
+    ) {
+      case 'rifle':
+        this.fireRifle(
+          direction
+        )
+        break
+
+      case 'scattergun':
+        this.fireScattergun(
+          direction
+        )
+        break
+
+      case 'cannon':
+        this.fireCannon(
+          direction
+        )
+        break
+
+      case 'photonLance':
+        this.firePhotonLance(
+          direction
+        )
+        break
+    }
   }
-}
 
   private fireRifle(
     direction: Phaser.Math.Vector2
@@ -858,166 +933,6 @@ private createRedBoxEffect(
       'rifle'
     )
   }
-
-  private firePhotonLance(
-  direction: Phaser.Math.Vector2
-) {
-  const beamLength = 1000
-  const beamWidth = 14
-  const damage = 3
-
-  const startX = this.player.x
-  const startY = this.player.y
-
-  const endX =
-    startX +
-    direction.x * beamLength
-
-  const endY =
-    startY +
-    direction.y * beamLength
-
-  // Visual beam
-  const beam =
-    this.add.rectangle(
-      startX,
-      startY,
-      beamLength,
-      beamWidth,
-      0x00ffff,
-      0.9
-    )
-
-  beam.setOrigin(
-    0,
-    0.5
-  )
-
-  beam.setRotation(
-    direction.angle()
-  )
-
-  // Bright center
-  const beamCore =
-    this.add.rectangle(
-      startX,
-      startY,
-      beamLength,
-      4,
-      0xffffff,
-      1
-    )
-
-  beamCore.setOrigin(
-    0,
-    0.5
-  )
-
-  beamCore.setRotation(
-    direction.angle()
-  )
-
-  // Beam collision line
-  const laserLine =
-    new Phaser.Geom.Line(
-      startX,
-      startY,
-      endX,
-      endY
-    )
-
-  // Copy the array because killEnemy()
-  // modifies this.enemies
-  const enemiesToCheck = [
-    ...this.enemies,
-  ]
-
-  for (
-    const enemy of enemiesToCheck
-  ) {
-    if (!enemy.active) {
-      continue
-    }
-
-    // Approximate enemy as a circle
-    // for beam collision.
-    const hitCircle =
-      new Phaser.Geom.Circle(
-        enemy.x,
-        enemy.y,
-        18
-      )
-
-    const hit =
-      Phaser.Geom.Intersects.LineToCircle(
-        laserLine,
-        hitCircle
-      )
-
-    if (!hit) {
-      continue
-    }
-
-    const currentHealth =
-      this.enemyHealth.get(
-        enemy
-      ) ?? 1
-
-    const newHealth =
-      currentHealth -
-      damage
-
-    this.enemyHealth.set(
-      enemy,
-      newHealth
-    )
-
-    if (newHealth <= 0) {
-      this.killEnemy(
-        enemy
-      )
-    } else {
-      // Hit flash
-      enemy.setFillStyle(
-        0xffffff
-      )
-
-      this.time.delayedCall(
-        75,
-        () => {
-          if (enemy.active) {
-            enemy.setFillStyle(
-              0xff4444
-            )
-          }
-        }
-      )
-    }
-  }
-
-  // Laser disappears quickly
-  this.tweens.add({
-    targets: [
-      beam,
-      beamCore,
-    ],
-
-    alpha: 0,
-
-    duration: 120,
-
-    onComplete: () => {
-      beam.destroy()
-      beamCore.destroy()
-    },
-  })
-
-  // Slight kick
-  this.cameras.main.shake(
-    80,
-    0.003
-  )
-}
 
   private fireScattergun(
     direction: Phaser.Math.Vector2
@@ -1063,6 +978,168 @@ private createRedBoxEffect(
       0xff4444,
       3,
       'cannon'
+    )
+  }
+
+  private firePhotonLance(
+    direction: Phaser.Math.Vector2
+  ) {
+    const beamLength = 1000
+    const beamWidth = 14
+    const damage = 3
+
+    const startX =
+      this.player.x
+
+    const startY =
+      this.player.y
+
+    const endX =
+      startX +
+      direction.x *
+        beamLength
+
+    const endY =
+      startY +
+      direction.y *
+        beamLength
+
+    const beam =
+      this.add.rectangle(
+        startX,
+        startY,
+        beamLength,
+        beamWidth,
+        0x00ffff,
+        0.9
+      )
+
+    beam.setOrigin(
+      0,
+      0.5
+    )
+
+    beam.setRotation(
+      direction.angle()
+    )
+
+    const beamCore =
+      this.add.rectangle(
+        startX,
+        startY,
+        beamLength,
+        4,
+        0xffffff,
+        1
+      )
+
+    beamCore.setOrigin(
+      0,
+      0.5
+    )
+
+    beamCore.setRotation(
+      direction.angle()
+    )
+
+    const laserLine =
+      new Phaser.Geom.Line(
+        startX,
+        startY,
+        endX,
+        endY
+      )
+
+    const enemiesToCheck = [
+      ...this.enemies,
+    ]
+
+    for (
+      const enemy of
+        enemiesToCheck
+    ) {
+      if (
+        !enemy.active
+      ) {
+        continue
+      }
+
+      const hitCircle =
+        new Phaser.Geom.Circle(
+          enemy.x,
+          enemy.y,
+          18
+        )
+
+      const hit =
+        Phaser.Geom.Intersects.LineToCircle(
+          laserLine,
+          hitCircle
+        )
+
+      if (!hit) {
+        continue
+      }
+
+      const currentHealth =
+        this.enemyHealth.get(
+          enemy
+        ) ?? 1
+
+      const newHealth =
+        currentHealth -
+        damage
+
+      this.enemyHealth.set(
+        enemy,
+        newHealth
+      )
+
+      if (
+        newHealth <= 0
+      ) {
+        this.killEnemy(
+          enemy
+        )
+      } else {
+        enemy.setFillStyle(
+          0xffffff
+        )
+
+        this.time.delayedCall(
+          75,
+          () => {
+            if (
+              enemy.active
+            ) {
+              enemy.setFillStyle(
+                0xff4444
+              )
+            }
+          }
+        )
+      }
+    }
+
+    this.tweens.add({
+      targets: [
+        beam,
+        beamCore,
+      ],
+
+      alpha: 0,
+
+      duration: 120,
+
+      onComplete: () => {
+        beam.destroy()
+        beamCore.destroy()
+      },
+    })
+
+    this.cameras.main.shake(
+      80,
+      0.003
     )
   }
 
@@ -1116,20 +1193,25 @@ private createRedBoxEffect(
   private moveBullets(
     delta: number
   ) {
-    if (this.isGameOver) {
+    if (
+      this.isGameOver
+    ) {
       return
     }
 
     for (
       let i =
-        this.bullets.length - 1;
+        this.bullets.length -
+        1;
       i >= 0;
       i--
     ) {
       const bullet =
         this.bullets[i]
 
-      if (!bullet.active) {
+      if (
+        !bullet.active
+      ) {
         continue
       }
 
@@ -1147,7 +1229,9 @@ private createRedBoxEffect(
           bullet
         )
 
-      if (!direction) {
+      if (
+        !direction
+      ) {
         continue
       }
 
@@ -1159,17 +1243,19 @@ private createRedBoxEffect(
         direction.y *
         distance
 
-      // Check enemy collisions
       for (
         let j =
-          this.enemies.length - 1;
+          this.enemies.length -
+          1;
         j >= 0;
         j--
       ) {
         const enemy =
           this.enemies[j]
 
-        if (!enemy.active) {
+        if (
+          !enemy.active
+        ) {
           continue
         }
 
@@ -1179,7 +1265,9 @@ private createRedBoxEffect(
             enemy.getBounds()
           )
 
-        if (!hit) {
+        if (
+          !hit
+        ) {
           continue
         }
 
@@ -1213,7 +1301,6 @@ private createRedBoxEffect(
           newHealth
         )
 
-        // Hit flash
         enemy.setFillStyle(
           0xffffff
         )
@@ -1221,7 +1308,9 @@ private createRedBoxEffect(
         this.time.delayedCall(
           75,
           () => {
-            if (enemy.active) {
+            if (
+              enemy.active
+            ) {
               enemy.setFillStyle(
                 0xff4444
               )
@@ -1229,7 +1318,6 @@ private createRedBoxEffect(
           }
         )
 
-        // Destroy bullet
         bullet.destroy()
 
         this.bulletDirections.delete(
@@ -1241,15 +1329,14 @@ private createRedBoxEffect(
           1
         )
 
-        // Direct hit death
-        if (newHealth <= 0) {
+        if (
+          newHealth <= 0
+        ) {
           this.killEnemy(
             enemy
           )
         }
 
-        // Cannon splash happens after
-        // direct-hit processing.
         if (
           weaponType ===
           'cannon'
@@ -1263,16 +1350,19 @@ private createRedBoxEffect(
         break
       }
 
-      if (!bullet.active) {
+      if (
+        !bullet.active
+      ) {
         continue
       }
 
-      // Destroy bullets outside arena
       if (
         bullet.x < 0 ||
-        bullet.x > 800 ||
+        bullet.x >
+          this.worldWidth ||
         bullet.y < 0 ||
-        bullet.y > 600
+        bullet.y >
+          this.worldHeight
       ) {
         bullet.destroy()
 
@@ -1314,18 +1404,19 @@ private createRedBoxEffect(
       },
     })
 
-    // Work backwards because enemies
-    // may be removed during the loop.
     for (
       let i =
-        this.enemies.length - 1;
+        this.enemies.length -
+        1;
       i >= 0;
       i--
     ) {
       const enemy =
         this.enemies[i]
 
-      if (!enemy.active) {
+      if (
+        !enemy.active
+      ) {
         continue
       }
 
@@ -1338,7 +1429,8 @@ private createRedBoxEffect(
         )
 
       if (
-        distance > radius
+        distance >
+        radius
       ) {
         continue
       }
@@ -1348,18 +1440,17 @@ private createRedBoxEffect(
           enemy
         ) ?? 1
 
-      const splashDamage = 2
-
       const newHealth =
-        currentHealth -
-        splashDamage
+        currentHealth - 2
 
       this.enemyHealth.set(
         enemy,
         newHealth
       )
 
-      if (newHealth <= 0) {
+      if (
+        newHealth <= 0
+      ) {
         this.killEnemy(
           enemy
         )
@@ -1370,16 +1461,18 @@ private createRedBoxEffect(
   private killEnemy(
     enemy: Phaser.GameObjects.Rectangle
   ) {
-    // Prevent double kills
-    if (!enemy.active) {
+    if (
+      !enemy.active
+    ) {
       return
     }
 
-    const x = enemy.x
-    const y = enemy.y
+    const x =
+      enemy.x
 
-    // Immediately make this enemy invalid
-    // before any other logic can hit it.
+    const y =
+      enemy.y
+
     enemy.destroy()
 
     this.createDeathBurst(
@@ -1392,7 +1485,9 @@ private createRedBoxEffect(
         enemy
       )
 
-    if (index !== -1) {
+    if (
+      index !== -1
+    ) {
       this.enemies.splice(
         index,
         1
@@ -1403,14 +1498,15 @@ private createRedBoxEffect(
       enemy
     )
 
+    this.tryDropLoot(
+      x,
+      y
+    )
 
-    this.tryDropLoot(x, y)
-    // XP is automatic
     this.currentXP++
 
     this.updateXPBar()
 
-    // Kill counter
     this.killCount++
 
     this.killText.setText(
@@ -1423,86 +1519,404 @@ private createRedBoxEffect(
     )
   }
 
-  private tryDropLoot(x: number, y: number) {
-  const roll = Math.random()
+  private tryDropLoot(
+    x: number,
+    y: number
+  ) {
+    const roll =
+      Math.random()
 
-  // 5% chance for RED BOX
-  if (roll < 0.05) {
-    this.spawnLoot(x, y, 'redbox')
-    return
-  }
-
-  // 20% chance for normal weapon loot
-  if (roll < 0.25) {
-    const weapons: WeaponType[] = [
-      'rifle',
-      'scattergun',
-      'cannon',
-    ]
-
-    const weapon =
-      Phaser.Utils.Array.GetRandom(
-        weapons
+    if (
+      roll < 0.05
+    ) {
+      this.spawnLoot(
+        x,
+        y,
+        'redbox'
       )
 
-    this.spawnLoot(
-      x,
-      y,
-      weapon
-    )
-  }
-}
+      return
+    }
 
-private spawnLoot(
-  x: number,
-  y: number,
-  type: LootType
-) {
-  let color = 0xffffff
-  let size = 18
+    if (
+      roll < 0.25
+    ) {
+      const weapons:
+        WeaponType[] = [
+          'rifle',
+          'scattergun',
+          'cannon',
+        ]
 
-  switch (type) {
-    case 'rifle':
-      color = 0xffff00
-      break
+      const weapon =
+        Phaser.Utils.Array.GetRandom(
+          weapons
+        )
 
-    case 'scattergun':
-      color = 0xffaa00
-      break
-
-    case 'cannon':
-      color = 0xff4444
-      break
-
-    case 'redbox':
-      color = 0xff0000
-      size = 22
-      break
+      this.spawnLoot(
+        x,
+        y,
+        weapon
+      )
+    }
   }
 
-  const object =
-    this.add.rectangle(
-      x,
-      y,
-      size,
-      size,
-      color
+  private spawnLoot(
+    x: number,
+    y: number,
+    type: LootType
+  ) {
+    let color =
+      0xffffff
+
+    let size =
+      18
+
+    switch (
+      type
+    ) {
+      case 'rifle':
+        color =
+          0xffff00
+        break
+
+      case 'scattergun':
+        color =
+          0xffaa00
+        break
+
+      case 'cannon':
+        color =
+          0xff4444
+        break
+
+      case 'redbox':
+        color =
+          0xff0000
+        size =
+          22
+        break
+    }
+
+    const object =
+      this.add.rectangle(
+        x,
+        y,
+        size,
+        size,
+        color
+      )
+
+    this.lootDrops.push({
+      object,
+      type,
+    })
+
+    if (
+      type ===
+      'redbox'
+    ) {
+      this.createRedBoxEffect(
+        object
+      )
+    }
+  }
+
+  private checkLootCollection() {
+    if (
+      this.isGameOver ||
+      !this.player.active
+    ) {
+      return
+    }
+
+    for (
+      let i =
+        this.lootDrops.length -
+        1;
+      i >= 0;
+      i--
+    ) {
+      const loot =
+        this.lootDrops[i]
+
+      if (
+        !loot.object.active
+      ) {
+        continue
+      }
+
+      const collected =
+        Phaser.Geom.Intersects.RectangleToRectangle(
+          this.player.getBounds(),
+          loot.object.getBounds()
+        )
+
+      if (
+        !collected
+      ) {
+        continue
+      }
+
+      this.collectLoot(
+        loot
+      )
+
+      this.lootDrops.splice(
+        i,
+        1
+      )
+    }
+  }
+
+  private collectLoot(
+    loot: LootDrop
+  ) {
+    const type =
+      loot.type
+
+    const beam =
+      loot.object.getData(
+        'beam'
+      ) as
+        | Phaser.GameObjects.Rectangle
+        | undefined
+
+    if (
+      beam?.active
+    ) {
+      beam.destroy()
+    }
+
+    loot.object.destroy()
+
+    if (
+      type === 'rifle' ||
+      type === 'scattergun' ||
+      type === 'cannon'
+    ) {
+      this.setWeapon(
+        type
+      )
+
+      this.showLootMessage(
+        `${type.toUpperCase()} EQUIPPED`
+      )
+
+      return
+    }
+
+    if (
+      type ===
+      'redbox'
+    ) {
+      this.collectRedBox()
+    }
+  }
+
+  private collectRedBox() {
+    this.setWeapon(
+      'photonLance'
     )
 
-  this.lootDrops.push({
-    object,
-    type,
-  })
-
-  if (type === 'redbox') {
-    this.createRedBoxEffect(
-      object
+    this.showRareLootMessage(
+      'PHOTON LANCE'
     )
   }
-}
+
+  private createRedBoxEffect(
+    redBox: Phaser.GameObjects.Rectangle
+  ) {
+    this.tweens.add({
+      targets:
+        redBox,
+
+      scale:
+        1.4,
+
+      alpha:
+        0.7,
+
+      duration:
+        400,
+
+      yoyo:
+        true,
+
+      repeat:
+        -1,
+    })
+
+    const beam =
+      this.add.rectangle(
+        redBox.x,
+        redBox.y - 60,
+        6,
+        120,
+        0xff0000,
+        0.35
+      )
+
+    this.tweens.add({
+      targets:
+        beam,
+
+      alpha:
+        0.1,
+
+      duration:
+        500,
+
+      yoyo:
+        true,
+
+      repeat:
+        -1,
+    })
+
+    redBox.setData(
+      'beam',
+      beam
+    )
+
+    this.cameras.main.flash(
+      150,
+      255,
+      0,
+      0
+    )
+
+    this.cameras.main.shake(
+      150,
+      0.006
+    )
+  }
+
+  private showLootMessage(
+    message: string
+  ) {
+    const text =
+      this.add
+        .text(
+          400,
+          120,
+          message,
+          {
+            fontSize:
+              '24px',
+
+            color:
+              '#ffffff',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.tweens.add({
+      targets:
+        text,
+
+      alpha:
+        0,
+
+      y:
+        90,
+
+      duration:
+        900,
+
+      onComplete:
+        () => {
+          text.destroy()
+        },
+    })
+  }
+
+  private showRareLootMessage(
+    weaponName: string
+  ) {
+    const rareText =
+      this.add
+        .text(
+          400,
+          100,
+          'RARE WEAPON',
+          {
+            fontSize:
+              '20px',
+
+            color:
+              '#ff4444',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    const weaponText =
+      this.add
+        .text(
+          400,
+          135,
+          weaponName,
+          {
+            fontSize:
+              '32px',
+
+            color:
+              '#ffffff',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.cameras.main.flash(
+      200,
+      255,
+      0,
+      0
+    )
+
+    this.tweens.add({
+      targets: [
+        rareText,
+        weaponText,
+      ],
+
+      alpha:
+        0,
+
+      y:
+        '-=30',
+
+      delay:
+        800,
+
+      duration:
+        600,
+
+      onComplete:
+        () => {
+          rareText.destroy()
+          weaponText.destroy()
+        },
+    })
+  }
 
   private updateXPBar() {
-    const maxWidth = 300
+    const maxWidth =
+      300
 
     const progress =
       this.currentXP /
@@ -1537,7 +1951,7 @@ private spawnLoot(
     this.xpToNextLevel =
       Math.floor(
         this.xpToNextLevel *
-        1.4
+          1.4
       )
 
     const gains =
@@ -1606,12 +2020,22 @@ private spawnLoot(
           220,
           `LEVEL ${this.playerLevel}`,
           {
-            fontSize: '42px',
-            color: '#44aaff',
-            align: 'center',
+            fontSize:
+              '42px',
+
+            color:
+              '#44aaff',
+
+            align:
+              'center',
           }
         )
-        .setOrigin(0.5)
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
 
     const statsText =
       this.add
@@ -1620,15 +2044,30 @@ private spawnLoot(
           280,
           `HP +${gains.hpGain}\nPOWER +${gains.powerGain}\nDEFENSE +${gains.defenseGain}`,
           {
-            fontSize: '20px',
-            color: '#ffffff',
-            align: 'center',
+            fontSize:
+              '20px',
+
+            color:
+              '#ffffff',
+
+            align:
+              'center',
           }
         )
-        .setOrigin(0.5)
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
 
-    levelText.setAlpha(0)
-    statsText.setAlpha(0)
+    levelText.setAlpha(
+      0
+    )
+
+    statsText.setAlpha(
+      0
+    )
 
     this.tweens.add({
       targets: [
@@ -1636,18 +2075,23 @@ private spawnLoot(
         statsText,
       ],
 
-      alpha: 1,
+      alpha:
+        1,
 
-      duration: 150,
+      duration:
+        150,
 
-      yoyo: true,
+      yoyo:
+        true,
 
-      hold: 600,
+      hold:
+        600,
 
-      onComplete: () => {
-        levelText.destroy()
-        statsText.destroy()
-      },
+      onComplete:
+        () => {
+          levelText.destroy()
+          statsText.destroy()
+        },
     })
   }
 
@@ -1663,8 +2107,9 @@ private spawnLoot(
 
       case 'cannon':
         return 1200
-        case 'photonLance':
-  return 900
+
+      case 'photonLance':
+        return 900
     }
   }
 
@@ -1699,43 +2144,61 @@ private spawnLoot(
         )
 
       this.tweens.add({
-        targets: particle,
+        targets:
+          particle,
 
         x:
           x +
-          Math.cos(angle) *
+          Math.cos(
+            angle
+          ) *
             speed,
 
         y:
           y +
-          Math.sin(angle) *
+          Math.sin(
+            angle
+          ) *
             speed,
 
-        alpha: 0,
+        alpha:
+          0,
 
-        scale: 0,
+        scale:
+          0,
 
-        duration: 300,
+        duration:
+          300,
 
-        ease: 'Power2',
+        ease:
+          'Power2',
 
-        onComplete: () => {
-          particle.destroy()
-        },
+        onComplete:
+          () => {
+            particle.destroy()
+          },
       })
     }
   }
 }
 
 const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
+  type:
+    Phaser.AUTO,
 
-  width: 800,
-  height: 600,
+  width:
+    800,
 
-  backgroundColor: '#111827',
+  height:
+    600,
 
-  scene: GameScene,
+  backgroundColor:
+    '#111827',
+
+  scene:
+    GameScene,
 }
 
-new Phaser.Game(config)
+new Phaser.Game(
+  config
+)
