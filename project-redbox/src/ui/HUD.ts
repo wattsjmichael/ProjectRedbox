@@ -30,6 +30,18 @@ export class HUD {
   private xpText!:
     Phaser.GameObjects.Text
 
+  private comboBoxes:
+    Phaser.GameObjects.Rectangle[] = []
+
+  private comboLabels:
+    Phaser.GameObjects.Text[] = []
+
+  private comboBarBackground!:
+    Phaser.GameObjects.Rectangle
+
+  private comboBarFill!:
+    Phaser.GameObjects.Rectangle
+
   constructor(
     scene: Phaser.Scene,
     stats: PlayerStats
@@ -40,6 +52,8 @@ export class HUD {
     this.create(
       stats
     )
+
+    this.createComboUI()
   }
 
   private create(
@@ -153,6 +167,271 @@ export class HUD {
         .setScrollFactor(
           0
         )
+  }
+
+  private createComboUI() {
+    const startX =
+      340
+
+    const y =
+      495
+
+    const spacing =
+      60
+
+    for (
+      let i = 0;
+      i < 3;
+      i++
+    ) {
+      const box =
+        this.scene.add
+          .rectangle(
+            startX +
+              i *
+                spacing,
+            y,
+            42,
+            42,
+            0x222222,
+            0.8
+          )
+          .setStrokeStyle(
+            2,
+            0x666666
+          )
+          .setScrollFactor(
+            0
+          )
+
+      const label =
+        this.scene.add
+          .text(
+            startX +
+              i *
+                spacing,
+            y,
+            `${i + 1}`,
+            {
+              fontSize:
+                '22px',
+
+              color:
+                '#777777',
+            }
+          )
+          .setOrigin(
+            0.5
+          )
+          .setScrollFactor(
+            0
+          )
+
+      this.comboBoxes.push(
+        box
+      )
+
+      this.comboLabels.push(
+        label
+      )
+    }
+
+    this.comboBarBackground =
+      this.scene.add
+        .rectangle(
+          400,
+          527,
+          160,
+          8,
+          0x222222
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.comboBarFill =
+      this.scene.add
+        .rectangle(
+          320,
+          527,
+          0,
+          6,
+          0xffcc44
+        )
+        .setOrigin(
+          0,
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.setComboVisible(
+      false
+    )
+  }
+
+  setComboVisible(
+    visible: boolean
+  ) {
+    for (
+      const box of
+        this.comboBoxes
+    ) {
+      box.setVisible(
+        visible
+      )
+    }
+
+    for (
+      const label of
+        this.comboLabels
+    ) {
+      label.setVisible(
+        visible
+      )
+    }
+
+    this.comboBarBackground.setVisible(
+      visible
+    )
+
+    this.comboBarFill.setVisible(
+      visible
+    )
+  }
+
+  hideCombo() {
+    this.setComboVisible(
+      false
+    )
+  }
+
+  updateCombo(
+    step: number,
+    progress: number,
+    failed: boolean
+  ) {
+    this.setComboVisible(
+      true
+    )
+
+    if (
+      failed
+    ) {
+      for (
+        const box of
+          this.comboBoxes
+      ) {
+        box.setFillStyle(
+          0x662222
+        )
+
+        box.setStrokeStyle(
+          2,
+          0xff4444
+        )
+      }
+
+      for (
+        const label of
+          this.comboLabels
+      ) {
+        label.setColor(
+          '#ff4444'
+        )
+      }
+
+      this.comboBarFill.width =
+        0
+
+      return
+    }
+
+    for (
+      let i = 0;
+      i < 3;
+      i++
+    ) {
+      const completed =
+        i <
+        step
+
+      const next =
+        i ===
+        step
+
+      if (
+        completed
+      ) {
+        this.comboBoxes[
+          i
+        ].setFillStyle(
+          0x665500
+        )
+
+        this.comboBoxes[
+          i
+        ].setStrokeStyle(
+          2,
+          0xffcc44
+        )
+
+        this.comboLabels[
+          i
+        ].setColor(
+          '#ffffff'
+        )
+      } else if (
+        next
+      ) {
+        this.comboBoxes[
+          i
+        ].setFillStyle(
+          0x333333
+        )
+
+        this.comboBoxes[
+          i
+        ].setStrokeStyle(
+          3,
+          0xffff88
+        )
+
+        this.comboLabels[
+          i
+        ].setColor(
+          '#ffff88'
+        )
+      } else {
+        this.comboBoxes[
+          i
+        ].setFillStyle(
+          0x222222
+        )
+
+        this.comboBoxes[
+          i
+        ].setStrokeStyle(
+          2,
+          0x666666
+        )
+
+        this.comboLabels[
+          i
+        ].setColor(
+          '#777777'
+        )
+      }
+    }
+
+    this.comboBarFill.width =
+      160 *
+      Phaser.Math.Clamp(
+        progress,
+        0,
+        1
+      )
   }
 
   updateHealth(

@@ -1,8 +1,5 @@
 import Phaser from 'phaser'
 
-import type {
-  WeaponType,
-} from '../weapons/WeaponTypes'
 
 import type {
   LootDrop,
@@ -84,7 +81,7 @@ export class LootSystem {
       0.25
     ) {
       const weapons:
-        WeaponType[] = [
+       LootType[] = [
           'rifle',
           'scattergun',
           'cannon',

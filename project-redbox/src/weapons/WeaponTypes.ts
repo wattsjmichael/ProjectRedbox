@@ -3,3 +3,4 @@ export type WeaponType =
   | 'scattergun'
   | 'cannon'
   | 'photonLance'
+  | 'greatsword'

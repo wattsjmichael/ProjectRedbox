@@ -100,15 +100,15 @@ export class GameScene
 
     this.createEnemyManager()
 
+    this.setupCamera()
+
+    this.createHUD()
+
     this.createWeaponSystem()
 
     this.createLootSystem()
 
     this.createEncounterManager()
-
-    this.setupCamera()
-
-    this.createHUD()
 
     this.createCrosshair()
 
@@ -139,8 +139,6 @@ export class GameScene
       this.worldHeight,
       0x111827
     )
-
-    // Temporary visual landmarks.
 
     this.add.rectangle(
       700,
@@ -218,6 +216,30 @@ export class GameScene
       })
   }
 
+  private setupCamera() {
+    this.cameras.main.setBounds(
+      0,
+      0,
+      this.worldWidth,
+      this.worldHeight
+    )
+
+    this.cameras.main.startFollow(
+      this.player.getObject(),
+      true,
+      0.08,
+      0.08
+    )
+  }
+
+  private createHUD() {
+    this.hud =
+      new HUD(
+        this,
+        this.playerStats
+      )
+  }
+
   private createWeaponSystem() {
     this.weaponSystem =
       new WeaponSystem({
@@ -260,6 +282,23 @@ export class GameScene
               enemy
             )
           },
+
+        onComboStateChange:
+          (state) => {
+            if (
+              this.weaponSystem
+                .getCurrentWeapon() !==
+              'greatsword'
+            ) {
+              return
+            }
+
+            this.hud.updateCombo(
+              state.step,
+              state.progress,
+              state.failed
+            )
+          },
       })
   }
 
@@ -299,30 +338,6 @@ export class GameScene
       })
   }
 
-  private setupCamera() {
-    this.cameras.main.setBounds(
-      0,
-      0,
-      this.worldWidth,
-      this.worldHeight
-    )
-
-    this.cameras.main.startFollow(
-      this.player.getObject(),
-      true,
-      0.08,
-      0.08
-    )
-  }
-
-  private createHUD() {
-    this.hud =
-      new HUD(
-        this,
-        this.playerStats
-      )
-  }
-
   private createCrosshair() {
     this.crosshair =
       this.add.circle(
@@ -340,8 +355,6 @@ export class GameScene
   }
 
   private setupDebugControls() {
-    // Temporary weapon shortcuts.
-
     this.input.keyboard!.on(
       'keydown-ONE',
       () => {
@@ -365,6 +378,15 @@ export class GameScene
       () => {
         this.setWeapon(
           'cannon'
+        )
+      }
+    )
+
+    this.input.keyboard!.on(
+      'keydown-FOUR',
+      () => {
+        this.setWeapon(
+          'greatsword'
         )
       }
     )
@@ -538,6 +560,23 @@ export class GameScene
     this.hud.updateWeapon(
       weapon
     )
+
+    if (
+      weapon ===
+      'greatsword'
+    ) {
+      this.hud.setComboVisible(
+        true
+      )
+
+      this.hud.updateCombo(
+        0,
+        0,
+        false
+      )
+    } else {
+      this.hud.hideCombo()
+    }
   }
 
   private killEnemy(
