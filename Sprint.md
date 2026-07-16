@@ -58,10 +58,10 @@
 
 ## Day 9 — Thu 7/23
 
-* [ ] **0:00–0:15 — Loot drops** — Enemies have drop chance
-* [ ] **0:15–0:35 — Weapon pickups** — Loot changes weapon
-* [ ] **0:35–0:50 — RED BOX** — Rare drop visual + special sound placeholder
-* [ ] **0:50–1:00 — Commit** — `v0.3.0 - RED BOX`
+* [x] **0:00–0:15 — Loot drops** — Enemies have drop chance
+* [x] **0:15–0:35 — Weapon pickups** — Loot changes weapon
+* [x] **0:35–0:50 — RED BOX** — Rare drop visual + special sound placeholder
+* [x] **0:50–1:00 — Commit** — `v0.3.0 - RED BOX`
 
 ## Day 10 — Fri 7/24
 
