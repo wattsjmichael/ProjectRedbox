@@ -30,31 +30,31 @@
 
 ## Day 5 — Sun 7/19
 
-* [ ] **0:00–0:20 — Player HP** — Enemies damage player
-* [ ] **0:20–0:40 — Death** — Player can die
-* [ ] **0:40–0:50 — Restart** — Game-over + restart button
+* [x] **0:00–0:20 — Player HP** — Enemies damage player
+* [x]**0:20–0:40 — Death** — Player can die
+* [x] **0:40–0:50 — Restart** — Game-over + restart button
 * [ ] **0:50–1:00 — Commit** — `v0.0.5 - You can die`
 
 ## Day 6 — Mon 7/20
 
-* [ ] **0:00–0:20 — XP drops** — Dead enemies drop XP
-* [ ] **0:20–0:40 — Collection** — Player collects XP
-* [ ] **0:40–0:50 — XP bar** — Basic HUD
-* [ ] **0:50–1:00 — Commit** — `v0.0.6 - XP`
+* [x] **0:00–0:20 — XP drops** — Dead enemies drop XP
+* [x] **0:20–0:40 — Collection** — Player collects XP
+* [x] **0:40–0:50 — XP bar** — Basic HUD
+* [x] **0:50–1:00 — Commit** — `v0.0.6 - XP`
 
 ## Day 7 — Tue 7/21
 
-* [ ] **0:00–0:20 — Leveling** — XP triggers level-up
-* [ ] **0:20–0:45 — Upgrade UI** — Pick 1 of 3 upgrades
-* [ ] **0:45–0:50 — Resume** — Combat continues
-* [ ] **0:50–1:00 — Commit** — `v0.1.0 - Core loop`
+* [x] **0:00–0:20 — Leveling** — XP triggers level-up
+* [x] **0:20–0:45 — Upgrade UI** — Set Level updgrades (slight randomness)
+* [x] **0:45–0:50 — Resume** — Combat continues
+* [x] **0:50–1:00 — Commit** — `v0.1.0 - Core loop`
 
 ## Day 8 — Wed 7/22
 
-* [ ] **0:00–0:15 — Rifle cleanup** — Tune basic gun
-* [ ] **0:15–0:35 — Scattergun** — Add spread weapon
-* [ ] **0:35–0:50 — Cannon** — Add slow explosive projectile
-* [ ] **0:50–1:00 — Commit** — `v0.2.0 - Arsenal`
+* [x] **0:00–0:15 — Rifle cleanup** — Tune basic gun
+* [x] **0:15–0:35 — Scattergun** — Add spread weapon
+* [x] **0:35–0:50 — Cannon** — Add slow explosive projectile
+* [x] **0:50–1:00 — Commit** — `v0.2.0 - Arsenal`
 
 ## Day 9 — Thu 7/23
 
