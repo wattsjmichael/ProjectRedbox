@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 
-type WeaponType = 'rifle' | 'scattergun' | 'cannon'
+type WeaponType = 'rifle' | 'scattergun' | 'cannon' | 'photonLance'
 
-type LootType = 'rifle' | 'scattergun' | 'cannon' | 'redbox'
+type LootType = 'rifle' | 'scattergun' | 'cannon' | 'photonLance' | 'redbox'
 
 interface LootDrop {
   object: Phaser.GameObjects.Rectangle
@@ -53,7 +53,7 @@ class GameScene extends Phaser.Scene {
   private playerDefense = 5
   private playerSpeed = 250
 
-  private xpBarBackground!: Phaser.GameObjects.Rectangle
+
   private xpBarFill!: Phaser.GameObjects.Rectangle
   private xpText!: Phaser.GameObjects.Text
 
@@ -148,13 +148,6 @@ class GameScene extends Phaser.Scene {
       }
     )
 
-    this.xpBarBackground = this.add.rectangle(
-      400,
-      580,
-      300,
-      16,
-      0x333333
-    )
 
     this.xpBarFill = this.add
       .rectangle(
@@ -338,13 +331,68 @@ private collectLoot(
 }
 
 private collectRedBox() {
-  this.showLootMessage(
-    'RARE WEAPON FOUND'
+  this.setWeapon(
+    'photonLance'
   )
 
-  // Placeholder rare reward:
-  // give the player the cannon for now
-  this.setWeapon('cannon')
+  this.showRareLootMessage(
+    'PHOTON LANCE'
+  )
+}
+
+private showRareLootMessage(
+  weaponName: string
+) {
+  const rareText =
+    this.add
+      .text(
+        400,
+        100,
+        'RARE WEAPON',
+        {
+          fontSize: '20px',
+          color: '#ff4444',
+        }
+      )
+      .setOrigin(0.5)
+
+  const weaponText =
+    this.add
+      .text(
+        400,
+        135,
+        weaponName,
+        {
+          fontSize: '32px',
+          color: '#ffffff',
+        }
+      )
+      .setOrigin(0.5)
+
+  this.cameras.main.flash(
+    200,
+    255,
+    0,
+    0
+  )
+
+  this.tweens.add({
+    targets: [
+      rareText,
+      weaponText,
+    ],
+
+    alpha: 0,
+    y: '-=30',
+
+    delay: 800,
+    duration: 600,
+
+    onComplete: () => {
+      rareText.destroy()
+      weaponText.destroy()
+    },
+  })
 }
 
 private showLootMessage(
@@ -756,51 +804,46 @@ private createRedBoxEffect(
   }
 
   private fireAtMouse() {
-    if (
-      this.isGameOver ||
-      !this.player.active
-    ) {
-      return
-    }
-
-    const pointer =
-      this.input.activePointer
-
-    const direction =
-      new Phaser.Math.Vector2(
-        pointer.worldX -
-          this.player.x,
-
-        pointer.worldY -
-          this.player.y
-      )
-
-    if (
-      direction.length() === 0
-    ) {
-      return
-    }
-
-    direction.normalize()
-
-    switch (
-      this.currentWeapon
-    ) {
-      case 'rifle':
-        this.fireRifle(direction)
-        break
-
-      case 'scattergun':
-        this.fireScattergun(
-          direction
-        )
-        break
-
-      case 'cannon':
-        this.fireCannon(direction)
-        break
-    }
+  if (
+    this.isGameOver ||
+    !this.player.active
+  ) {
+    return
   }
+
+  const pointer =
+    this.input.activePointer
+
+  const direction =
+    new Phaser.Math.Vector2(
+      pointer.worldX - this.player.x,
+      pointer.worldY - this.player.y
+    )
+
+  if (direction.length() === 0) {
+    return
+  }
+
+  direction.normalize()
+
+  switch (this.currentWeapon) {
+    case 'rifle':
+      this.fireRifle(direction)
+      break
+
+    case 'scattergun':
+      this.fireScattergun(direction)
+      break
+
+    case 'cannon':
+      this.fireCannon(direction)
+      break
+
+    case 'photonLance':
+      this.firePhotonLance(direction)
+      break
+  }
+}
 
   private fireRifle(
     direction: Phaser.Math.Vector2
@@ -815,6 +858,166 @@ private createRedBoxEffect(
       'rifle'
     )
   }
+
+  private firePhotonLance(
+  direction: Phaser.Math.Vector2
+) {
+  const beamLength = 1000
+  const beamWidth = 14
+  const damage = 3
+
+  const startX = this.player.x
+  const startY = this.player.y
+
+  const endX =
+    startX +
+    direction.x * beamLength
+
+  const endY =
+    startY +
+    direction.y * beamLength
+
+  // Visual beam
+  const beam =
+    this.add.rectangle(
+      startX,
+      startY,
+      beamLength,
+      beamWidth,
+      0x00ffff,
+      0.9
+    )
+
+  beam.setOrigin(
+    0,
+    0.5
+  )
+
+  beam.setRotation(
+    direction.angle()
+  )
+
+  // Bright center
+  const beamCore =
+    this.add.rectangle(
+      startX,
+      startY,
+      beamLength,
+      4,
+      0xffffff,
+      1
+    )
+
+  beamCore.setOrigin(
+    0,
+    0.5
+  )
+
+  beamCore.setRotation(
+    direction.angle()
+  )
+
+  // Beam collision line
+  const laserLine =
+    new Phaser.Geom.Line(
+      startX,
+      startY,
+      endX,
+      endY
+    )
+
+  // Copy the array because killEnemy()
+  // modifies this.enemies
+  const enemiesToCheck = [
+    ...this.enemies,
+  ]
+
+  for (
+    const enemy of enemiesToCheck
+  ) {
+    if (!enemy.active) {
+      continue
+    }
+
+    // Approximate enemy as a circle
+    // for beam collision.
+    const hitCircle =
+      new Phaser.Geom.Circle(
+        enemy.x,
+        enemy.y,
+        18
+      )
+
+    const hit =
+      Phaser.Geom.Intersects.LineToCircle(
+        laserLine,
+        hitCircle
+      )
+
+    if (!hit) {
+      continue
+    }
+
+    const currentHealth =
+      this.enemyHealth.get(
+        enemy
+      ) ?? 1
+
+    const newHealth =
+      currentHealth -
+      damage
+
+    this.enemyHealth.set(
+      enemy,
+      newHealth
+    )
+
+    if (newHealth <= 0) {
+      this.killEnemy(
+        enemy
+      )
+    } else {
+      // Hit flash
+      enemy.setFillStyle(
+        0xffffff
+      )
+
+      this.time.delayedCall(
+        75,
+        () => {
+          if (enemy.active) {
+            enemy.setFillStyle(
+              0xff4444
+            )
+          }
+        }
+      )
+    }
+  }
+
+  // Laser disappears quickly
+  this.tweens.add({
+    targets: [
+      beam,
+      beamCore,
+    ],
+
+    alpha: 0,
+
+    duration: 120,
+
+    onComplete: () => {
+      beam.destroy()
+      beamCore.destroy()
+    },
+  })
+
+  // Slight kick
+  this.cameras.main.shake(
+    80,
+    0.003
+  )
+}
 
   private fireScattergun(
     direction: Phaser.Math.Vector2
@@ -1460,6 +1663,8 @@ private spawnLoot(
 
       case 'cannon':
         return 1200
+        case 'photonLance':
+  return 900
     }
   }
 
