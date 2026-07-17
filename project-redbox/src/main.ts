@@ -12,20 +12,29 @@ import {
   GameScene,
 } from './scenes/GameScene'
 
+import {
+  ResultsScene,
+} from './scenes/ResultsScene'
+
 const config:
   Phaser.Types.Core.GameConfig = {
-    type: Phaser.AUTO,
+    type:
+      Phaser.AUTO,
 
-    width: 800,
+    width:
+      800,
 
-    height: 600,
+    height:
+      600,
 
-    backgroundColor: '#050505',
+    backgroundColor:
+      '#050505',
 
     scene: [
       BootScene,
       TitleScene,
       GameScene,
+      ResultsScene,
     ],
   }
 

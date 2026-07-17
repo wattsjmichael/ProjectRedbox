@@ -80,11 +80,20 @@ export class GameScene
   private killCount =
     0
 
+  private rareCount =
+    0
+
   private isGameOver =
     false
 
   private wyrmSpawned =
     false
+
+  private awaitingBossReward =
+    false
+
+  private runStartTime =
+    0
 
   private playerStats =
     createDefaultPlayerStats()
@@ -120,6 +129,9 @@ export class GameScene
     this.createCrosshair()
 
     this.setupDebugControls()
+
+    this.runStartTime =
+      this.time.now
   }
 
   private resetRunState() {
@@ -134,10 +146,16 @@ export class GameScene
     this.killCount =
       0
 
+    this.rareCount =
+      0
+
     this.isGameOver =
       false
 
     this.wyrmSpawned =
+      false
+
+    this.awaitingBossReward =
       false
   }
 
@@ -453,12 +471,54 @@ export class GameScene
         )
       }
     )
+
     this.input.keyboard!.on(
-  'keydown-FIVE',
-  () => {
-    this.spawnWyrmDebug()
+      'keydown-FIVE',
+      () => {
+        this.spawnWyrmDebug()
+      }
+    )
   }
-)
+
+  private spawnWyrmDebug() {
+    if (
+      this.isGameOver ||
+      this.enemyManager.isWyrmAlive()
+    ) {
+      return
+    }
+
+    this.wyrmSpawned =
+      true
+
+    this.hud.showEncounterMessage(
+      'DEBUG: WYRM INCOMING'
+    )
+
+    this.time.delayedCall(
+      500,
+      () => {
+        if (
+          this.isGameOver
+        ) {
+          return
+        }
+
+        this.enemyManager.spawnWyrm(
+          1200,
+          900
+        )
+
+        this.hud.showBoss(
+          ENEMY_STATS.wyrm.health,
+          ENEMY_STATS.wyrm.health
+        )
+
+        this.hud.showEncounterMessage(
+          'THE WYRM HAS LANDED'
+        )
+      }
+    )
   }
 
   update(
@@ -504,47 +564,6 @@ export class GameScene
       pointer.worldY
     )
   }
-
-  private spawnWyrmDebug() {
-  if (
-    this.isGameOver ||
-    this.enemyManager.isWyrmAlive()
-  ) {
-    return
-  }
-
-  this.wyrmSpawned =
-    true
-
-  this.hud.showEncounterMessage(
-    'DEBUG: WYRM INCOMING'
-  )
-
-  this.time.delayedCall(
-    500,
-    () => {
-      if (
-        this.isGameOver
-      ) {
-        return
-      }
-
-      this.enemyManager.spawnWyrm(
-        1200,
-        900
-      )
-
-      this.hud.showBoss(
-        ENEMY_STATS.wyrm.health,
-        ENEMY_STATS.wyrm.health
-      )
-
-      this.hud.showEncounterMessage(
-        'THE WYRM HAS LANDED'
-      )
-    }
-  )
-}
 
   private triggerEncounter(
     zone:
@@ -593,15 +612,12 @@ export class GameScene
           zone
         )
 
-      const enemy =
+      spawned.push(
         this.enemyManager.spawnAt(
           position.x,
           position.y,
           'normal'
         )
-
-      spawned.push(
-        enemy
       )
     }
 
@@ -615,15 +631,12 @@ export class GameScene
           zone
         )
 
-      const enemy =
+      spawned.push(
         this.enemyManager.spawnAt(
           position.x,
           position.y,
           'elite'
         )
-
-      spawned.push(
-        enemy
       )
     }
 
@@ -676,7 +689,7 @@ export class GameScene
 
     if (
       cleared !==
-      total ||
+        total ||
       this.wyrmSpawned
     ) {
       return
@@ -930,8 +943,11 @@ export class GameScene
   }
 
   private handleWyrmDeath(
-    x: number,
-    y: number
+    x:
+      number,
+
+    y:
+      number
   ) {
     this.hud.hideBoss()
 
@@ -956,6 +972,9 @@ export class GameScene
       'WYRM TERMINATED'
     )
 
+    this.awaitingBossReward =
+      true
+
     this.time.delayedCall(
       900,
       () => {
@@ -964,6 +983,83 @@ export class GameScene
           y,
           'redbox'
         )
+      }
+    )
+  }
+
+  private handleLootCollected(
+    type:
+      LootType
+  ) {
+    if (
+      type ===
+        'rifle' ||
+      type ===
+        'scattergun' ||
+      type ===
+        'cannon' ||
+      type ===
+        'greatsword'
+    ) {
+      this.setWeapon(
+        type
+      )
+
+      this.hud.showLootMessage(
+        `${type.toUpperCase()} EQUIPPED`
+      )
+
+      return
+    }
+
+    if (
+      type ===
+      'redbox'
+    ) {
+      this.rareCount++
+
+      this.setWeapon(
+        'photonLance'
+      )
+
+      this.hud.showRareLootMessage(
+        'PHOTON LANCE'
+      )
+
+      if (
+        this.awaitingBossReward
+      ) {
+        this.awaitingBossReward =
+          false
+
+        this.time.delayedCall(
+          1200,
+          () => {
+            this.completeRun()
+          }
+        )
+      }
+    }
+  }
+
+  private completeRun() {
+    const timeMs =
+      this.time.now -
+      this.runStartTime
+
+    this.scene.start(
+      'ResultsScene',
+      {
+        kills:
+          this.killCount,
+
+        level:
+          this.playerStats.level,
+
+        rares:
+          this.rareCount,
+
+        timeMs,
       }
     )
   }
@@ -1082,45 +1178,6 @@ export class GameScene
           blast.destroy()
         },
     })
-  }
-
-  private handleLootCollected(
-    type:
-      LootType
-  ) {
-    if (
-      type ===
-        'rifle' ||
-      type ===
-        'scattergun' ||
-      type ===
-        'cannon' ||
-      type ===
-        'greatsword'
-    ) {
-      this.setWeapon(
-        type
-      )
-
-      this.hud.showLootMessage(
-        `${type.toUpperCase()} EQUIPPED`
-      )
-
-      return
-    }
-
-    if (
-      type ===
-      'redbox'
-    ) {
-      this.setWeapon(
-        'photonLance'
-      )
-
-      this.hud.showRareLootMessage(
-        'PHOTON LANCE'
-      )
-    }
   }
 
   private createDeathBurst(
