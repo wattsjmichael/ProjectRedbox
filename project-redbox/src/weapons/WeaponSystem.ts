@@ -6,8 +6,12 @@ import type {
 
 export interface ComboState {
   step: number
-  progress: number
+  elapsed: number
+  comboWindow: number
+  perfectStart: number
+  perfectEnd: number
   failed: boolean
+  perfect: boolean
 }
 
 interface WeaponSystemConfig {
@@ -41,13 +45,17 @@ interface WeaponSystemConfig {
 }
 
 export class WeaponSystem {
-  private scene: Phaser.Scene
+  private scene:
+    Phaser.Scene
 
   private player:
     Phaser.GameObjects.Rectangle
 
-  private worldWidth: number
-  private worldHeight: number
+  private worldWidth:
+    number
+
+  private worldHeight:
+    number
 
   private getEnemies:
     WeaponSystemConfig['getEnemies']
@@ -67,7 +75,8 @@ export class WeaponSystem {
   private currentWeapon:
     WeaponType = 'rifle'
 
-  private fireTimer = 0
+  private fireTimer =
+    0
 
   private bullets:
     Phaser.GameObjects.Rectangle[] = []
@@ -78,15 +87,30 @@ export class WeaponSystem {
       Phaser.Math.Vector2
     >()
 
-  // Greatsword combo state
-  private comboStep = 0
-  private comboTimer = 0
-  private readonly comboWindow = 700
+  // Greatsword rhythm
+  private comboStep =
+    0
 
-  private meleeLocked = false
+  private comboTimer =
+    0
 
-  private targetX = 0
-  private targetY = 0
+  private readonly comboWindow =
+    700
+
+  private readonly perfectStart =
+    180
+
+  private readonly perfectEnd =
+    420
+
+  private meleeLocked =
+    false
+
+  private targetX =
+    0
+
+  private targetY =
+    0
 
   constructor(
     config: WeaponSystemConfig
@@ -149,7 +173,8 @@ export class WeaponSystem {
       }
     }
 
-    this.bullets = []
+    this.bullets =
+      []
 
     this.bulletDirections.clear()
 
@@ -159,19 +184,7 @@ export class WeaponSystem {
     this.fireTimer =
       0
 
-    this.comboStep =
-      0
-
-    this.comboTimer =
-      0
-
-    this.meleeLocked =
-      false
-
-    this.emitComboState(
-      false,
-      0
-    )
+    this.resetCombo()
   }
 
   update(
@@ -224,6 +237,14 @@ export class WeaponSystem {
     this.fireTimer =
       0
 
+    this.resetCombo()
+  }
+
+  getCurrentWeapon() {
+    return this.currentWeapon
+  }
+
+  private resetCombo() {
     this.comboStep =
       0
 
@@ -233,27 +254,44 @@ export class WeaponSystem {
     this.meleeLocked =
       false
 
-    this.emitComboState(
-      false,
-      0
-    )
-  }
+    this.emitComboState({
+      failed:
+        false,
 
-  getCurrentWeapon() {
-    return this.currentWeapon
+      perfect:
+        false,
+    })
   }
 
   private emitComboState(
-    failed = false,
-    progress = 1
+    options: {
+      failed?: boolean
+      perfect?: boolean
+    } = {}
   ) {
     this.onComboStateChange?.({
       step:
         this.comboStep,
 
-      progress,
+      elapsed:
+        this.comboTimer,
 
-      failed,
+      comboWindow:
+        this.comboWindow,
+
+      perfectStart:
+        this.perfectStart,
+
+      perfectEnd:
+        this.perfectEnd,
+
+      failed:
+        options.failed ??
+        false,
+
+      perfect:
+        options.perfect ??
+        false,
     })
   }
 
@@ -277,19 +315,7 @@ export class WeaponSystem {
     this.comboTimer +=
       delta
 
-    const progress =
-      Phaser.Math.Clamp(
-        1 -
-          this.comboTimer /
-            this.comboWindow,
-        0,
-        1
-      )
-
-    this.emitComboState(
-      false,
-      progress
-    )
+    this.emitComboState()
 
     if (
       this.comboTimer >
@@ -301,10 +327,10 @@ export class WeaponSystem {
       this.comboTimer =
         0
 
-      this.emitComboState(
-        true,
-        0
-      )
+      this.emitComboState({
+        failed:
+          true,
+      })
 
       this.scene.time.delayedCall(
         250,
@@ -313,10 +339,7 @@ export class WeaponSystem {
             this.currentWeapon ===
             'greatsword'
           ) {
-            this.emitComboState(
-              false,
-              0
-            )
+            this.emitComboState()
           }
         }
       )
@@ -331,58 +354,94 @@ export class WeaponSystem {
       return
     }
 
-    this.comboStep++
-
+    // First attack always starts immediately.
     if (
-      this.comboStep >
-      3
+      this.comboStep ===
+      0
     ) {
       this.comboStep =
         1
+
+      this.comboTimer =
+        0
+
+      this.emitComboState()
+
+      this.performGreatswordSwing(
+        1,
+        95,
+        65,
+        180,
+        false
+      )
+
+      return
     }
+
+    // Clicking too early does not advance.
+    if (
+      this.comboTimer <
+      this.perfectStart
+    ) {
+      this.emitComboState()
+
+      return
+    }
+
+    const wasPerfect =
+      this.comboTimer >=
+        this.perfectStart &&
+      this.comboTimer <=
+        this.perfectEnd
+
+    // We know we're still inside
+    // the overall combo window here.
+    this.comboStep++
 
     this.comboTimer =
       0
 
-    this.emitComboState(
-      false,
-      1
-    )
+    this.emitComboState({
+      perfect:
+        wasPerfect,
+    })
 
     switch (
       this.comboStep
     ) {
-      case 1:
-        this.performGreatswordSwing(
-          1,
-          95,
-          65,
-          180
-        )
-        break
+      case 2: {
+        const damage =
+          wasPerfect
+            ? 3
+            : 2
 
-      case 2:
         this.performGreatswordSwing(
-          2,
+          damage,
           115,
           85,
-          240
+          240,
+          wasPerfect
         )
-        break
 
-      case 3:
+        break
+      }
+
+      case 3: {
+        const damage =
+          wasPerfect
+            ? 6
+            : 4
+
         this.performGreatswordSwing(
-          4,
+          damage,
           145,
           120,
-          400
+          400,
+          wasPerfect
         )
 
-        this.emitComboState(
-          false,
-          1
-        )
-
+        // Keep final combo state
+        // visible briefly.
         this.scene.time.delayedCall(
           450,
           () => {
@@ -399,14 +458,12 @@ export class WeaponSystem {
             this.comboTimer =
               0
 
-            this.emitComboState(
-              false,
-              0
-            )
+            this.emitComboState()
           }
         )
 
         break
+      }
     }
   }
 
@@ -414,7 +471,8 @@ export class WeaponSystem {
     damage: number,
     range: number,
     arcDegrees: number,
-    lockDuration: number
+    lockDuration: number,
+    perfect: boolean
   ) {
     this.meleeLocked =
       true
@@ -445,7 +503,8 @@ export class WeaponSystem {
 
     this.createSwordVisual(
       direction,
-      lockDuration
+      lockDuration,
+      perfect
     )
 
     const enemies = [
@@ -510,22 +569,33 @@ export class WeaponSystem {
         enemy,
         damage,
         direction,
-        this.comboStep
+        this.comboStep,
+        perfect
       )
     }
 
     if (
-      damage >=
-      4
+      this.comboStep ===
+      3
     ) {
       this.scene.cameras.main.shake(
-        140,
-        0.012
+        perfect
+          ? 180
+          : 140,
+
+        perfect
+          ? 0.018
+          : 0.012
       )
     } else {
       this.scene.cameras.main.shake(
-        60,
-        0.004
+        perfect
+          ? 80
+          : 60,
+
+        perfect
+          ? 0.007
+          : 0.004
       )
     }
 
@@ -549,7 +619,10 @@ export class WeaponSystem {
       Phaser.Math.Vector2,
 
     comboStep:
-      number
+      number,
+
+    perfect:
+      boolean
   ) {
     const currentHealth =
       this.getEnemyHealth(
@@ -580,12 +653,19 @@ export class WeaponSystem {
       enemy
     )
 
-    const knockback =
+    let knockback =
       comboStep === 3
         ? 70
         : comboStep === 2
           ? 40
           : 20
+
+    if (
+      perfect
+    ) {
+      knockback *=
+        1.35
+    }
 
     enemy.x +=
       direction.x *
@@ -601,22 +681,30 @@ export class WeaponSystem {
       Phaser.Math.Vector2,
 
     duration:
-      number
+      number,
+
+    perfect:
+      boolean
   ) {
     const swordLength =
-      this.comboStep === 3
+      this.comboStep ===
+      3
         ? 130
         : 105
 
     const swordWidth =
-      this.comboStep === 3
+      this.comboStep ===
+      3
         ? 22
         : 16
 
     const color =
-      this.comboStep === 3
-        ? 0xff4444
-        : 0xdddddd
+      perfect
+        ? 0xffdd55
+        : this.comboStep ===
+            3
+          ? 0xff4444
+          : 0xdddddd
 
     const sword =
       this.scene.add.rectangle(
@@ -938,7 +1026,6 @@ export class WeaponSystem {
       onComplete:
         () => {
           beam.destroy()
-
           beamCore.destroy()
         },
     })

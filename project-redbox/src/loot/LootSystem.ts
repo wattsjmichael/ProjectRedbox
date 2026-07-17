@@ -10,7 +10,7 @@ interface LootSystemConfig {
   scene: Phaser.Scene
 
   player:
-    Phaser.GameObjects.Rectangle
+  Phaser.GameObjects.Rectangle
 
   onLootCollected: (
     type: LootType
@@ -81,10 +81,11 @@ export class LootSystem {
       0.25
     ) {
       const weapons:
-       LootType[] = [
+        LootType[] = [
           'rifle',
           'scattergun',
           'cannon',
+          'greatsword'
         ]
 
       const weapon =
@@ -112,7 +113,7 @@ export class LootSystem {
       18
 
     switch (
-      type
+    type
     ) {
       case 'rifle':
         color =
@@ -135,6 +136,14 @@ export class LootSystem {
 
         size =
           22
+        break
+
+      case 'greatsword':
+        color =
+          0xdddddd
+
+        size =
+          26
         break
     }
 
@@ -223,8 +232,8 @@ export class LootSystem {
       loot.object.getData(
         'beam'
       ) as
-        | Phaser.GameObjects.Rectangle
-        | undefined
+      | Phaser.GameObjects.Rectangle
+      | undefined
 
     if (
       beam?.active
@@ -267,7 +276,7 @@ export class LootSystem {
       this.scene.add.rectangle(
         redBox.x,
         redBox.y -
-          60,
+        60,
         6,
         120,
         0xff0000,
@@ -312,7 +321,7 @@ export class LootSystem {
   destroyAll() {
     for (
       const loot of
-        this.lootDrops
+      this.lootDrops
     ) {
       this.destroyLoot(
         loot

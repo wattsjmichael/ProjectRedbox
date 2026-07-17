@@ -1,36 +1,86 @@
 import Phaser from 'phaser'
 
+import type {
+  EnemyType,
+} from './EnemyTypes'
+
+import {
+  ENEMY_STATS,
+} from './EnemyTypes'
+
 interface EnemyManagerConfig {
   scene: Phaser.Scene
-  player: Phaser.GameObjects.Rectangle
-  onPlayerDamage: (amount: number) => void
+
+  player:
+    Phaser.GameObjects.Rectangle
+
+  onPlayerDamage:
+    (
+      amount: number
+    ) => void
 }
 
 export class EnemyManager {
-  private scene: Phaser.Scene
-  private player: Phaser.GameObjects.Rectangle
+  private scene:
+    Phaser.Scene
 
-  private enemies: Phaser.GameObjects.Rectangle[] = []
+  private player:
+    Phaser.GameObjects.Rectangle
 
-  private enemyHealth = new Map<
-    Phaser.GameObjects.Rectangle,
-    number
-  >()
+  private enemies:
+    Phaser.GameObjects.Rectangle[] = []
 
-  private playerDamageCooldown = 0
+  private enemyHealth =
+    new Map<
+      Phaser.GameObjects.Rectangle,
+      number
+    >()
 
-  private readonly enemySpeed = 80
-  private readonly chaseDistance = 500
-  private readonly contactDamage = 10
-  private readonly damageCooldown = 500
+  private enemyTypes =
+    new Map<
+      Phaser.GameObjects.Rectangle,
+      EnemyType
+    >()
+
+  private playerDamageCooldown =
+    0
+
+  private readonly chaseDistance =
+    500
+
+  private readonly damageCooldown =
+    500
 
   private onPlayerDamage:
     EnemyManagerConfig['onPlayerDamage']
 
-  constructor(config: EnemyManagerConfig) {
-    this.scene = config.scene
-    this.player = config.player
-    this.onPlayerDamage = config.onPlayerDamage
+  // WYRM BOSS STATE
+
+  private wyrm:
+    Phaser.GameObjects.Rectangle |
+    null = null
+
+  private wyrmSlamTimer =
+    0
+
+  private readonly wyrmSlamCooldown =
+    3500
+
+  private wyrmSlamInProgress =
+    false
+
+  constructor(
+    config:
+      EnemyManagerConfig
+  ) {
+    this.scene =
+      config.scene
+
+    this.player =
+      config.player
+
+    this.onPlayerDamage =
+      config.onPlayerDamage
   }
 
   getEnemies() {
@@ -38,55 +88,226 @@ export class EnemyManager {
   }
 
   getEnemyHealth(
-    enemy: Phaser.GameObjects.Rectangle
+    enemy:
+      Phaser.GameObjects.Rectangle
   ) {
-    return this.enemyHealth.get(enemy) ?? 1
+    return (
+      this.enemyHealth.get(
+        enemy
+      ) ?? 1
+    )
   }
 
   setEnemyHealth(
-    enemy: Phaser.GameObjects.Rectangle,
-    health: number
+    enemy:
+      Phaser.GameObjects.Rectangle,
+
+    health:
+      number
   ) {
     this.enemyHealth.set(
       enemy,
       health
+    )
+  }
+
+  getEnemyType(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    return (
+      this.enemyTypes.get(
+        enemy
+      ) ?? 'normal'
+    )
+  }
+
+  getWyrm() {
+    return this.wyrm
+  }
+
+  isWyrmAlive() {
+    return (
+      this.wyrm !==
+        null &&
+      this.wyrm.active
     )
   }
 
   spawnAt(
     x: number,
     y: number,
-    health = 3
+    type: EnemyType = 'normal'
   ) {
+    const stats =
+      ENEMY_STATS[
+        type
+      ]
+
     const enemy =
       this.scene.add.rectangle(
         x,
         y,
-        24,
-        24,
-        0xff4444
+        stats.size,
+        stats.size,
+        stats.color
       )
+
+    enemy.setData(
+      'enemyType',
+      type
+    )
 
     this.enemyHealth.set(
       enemy,
-      health
+      stats.health
+    )
+
+    this.enemyTypes.set(
+      enemy,
+      type
     )
 
     this.enemies.push(
       enemy
     )
 
+    if (
+      type ===
+      'elite'
+    ) {
+      this.createEliteEffect(
+        enemy
+      )
+    }
+
+    if (
+      type ===
+      'wyrm'
+    ) {
+      this.createWyrmEffect(
+        enemy
+      )
+
+      this.wyrm =
+        enemy
+
+      this.wyrmSlamTimer =
+        0
+    }
+
     return enemy
   }
 
-  update(delta: number) {
-    if (!this.player.active) {
+  spawnWyrm(
+    x: number,
+    y: number
+  ) {
+    if (
+      this.isWyrmAlive()
+    ) {
+      return (
+        this.wyrm!
+      )
+    }
+
+    return this.spawnAt(
+      x,
+      y,
+      'wyrm'
+    )
+  }
+
+  private createEliteEffect(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    enemy.setStrokeStyle(
+      3,
+      0xffffff,
+      0.8
+    )
+
+    this.scene.tweens.add({
+      targets:
+        enemy,
+
+      scale:
+        1.12,
+
+      duration:
+        400,
+
+      yoyo:
+        true,
+
+      repeat:
+        -1,
+    })
+  }
+
+  private createWyrmEffect(
+    wyrm:
+      Phaser.GameObjects.Rectangle
+  ) {
+    wyrm.setStrokeStyle(
+      5,
+      0xff4444,
+      1
+    )
+
+    wyrm.setScale(
+      0.2
+    )
+
+    wyrm.setAlpha(
+      0
+    )
+
+    this.scene.tweens.add({
+      targets:
+        wyrm,
+
+      scale:
+        1,
+
+      alpha:
+        1,
+
+      duration:
+        700,
+
+      ease:
+        'Back.Out',
+
+      onComplete:
+        () => {
+          this.scene.cameras.main.shake(
+            300,
+            0.02
+          )
+        },
+    })
+  }
+
+  update(
+    delta: number
+  ) {
+    if (
+      !this.player.active
+    ) {
       return
     }
 
-    this.moveEnemies(delta)
+    this.moveEnemies(
+      delta
+    )
 
     this.checkPlayerCollision(
+      delta
+    )
+
+    this.updateWyrm(
       delta
     )
   }
@@ -94,17 +315,25 @@ export class EnemyManager {
   private moveEnemies(
     delta: number
   ) {
-    const distance =
-      this.enemySpeed *
-      (delta / 1000)
-
     for (
       const enemy of
         this.enemies
     ) {
-      if (!enemy.active) {
+      if (
+        !enemy.active
+      ) {
         continue
       }
+
+      const type =
+        this.getEnemyType(
+          enemy
+        )
+
+      const stats =
+        ENEMY_STATS[
+          type
+        ]
 
       const distanceToPlayer =
         Phaser.Math.Distance.Between(
@@ -114,11 +343,22 @@ export class EnemyManager {
           this.player.y
         )
 
-      // Don't let enemies chase
-      // across the entire map.
+      // Wyrm always pursues.
+      // Regular enemies have limited aggro range.
       if (
+        type !==
+          'wyrm' &&
         distanceToPlayer >
-        this.chaseDistance
+          this.chaseDistance
+      ) {
+        continue
+      }
+
+      // Wyrm pauses while telegraphing slam.
+      if (
+        type ===
+          'wyrm' &&
+        this.wyrmSlamInProgress
       ) {
         continue
       }
@@ -131,14 +371,213 @@ export class EnemyManager {
           this.player.y
         )
 
+      const movement =
+        stats.speed *
+        (delta / 1000)
+
       enemy.x +=
-        Math.cos(angle) *
-        distance
+        Math.cos(
+          angle
+        ) *
+        movement
 
       enemy.y +=
-        Math.sin(angle) *
-        distance
+        Math.sin(
+          angle
+        ) *
+        movement
     }
+  }
+
+  private updateWyrm(
+    delta: number
+  ) {
+    if (
+      !this.isWyrmAlive()
+    ) {
+      return
+    }
+
+    if (
+      this.wyrmSlamInProgress
+    ) {
+      return
+    }
+
+    this.wyrmSlamTimer +=
+      delta
+
+    if (
+      this.wyrmSlamTimer <
+      this.wyrmSlamCooldown
+    ) {
+      return
+    }
+
+    this.wyrmSlamTimer =
+      0
+
+    this.startWyrmSlam()
+  }
+
+  private startWyrmSlam() {
+    if (
+      !this.wyrm ||
+      !this.wyrm.active ||
+      !this.player.active
+    ) {
+      return
+    }
+
+    this.wyrmSlamInProgress =
+      true
+
+    // Lock the slam target
+    // to where the player was
+    // when the warning appeared.
+    const targetX =
+      this.player.x
+
+    const targetY =
+      this.player.y
+
+    const radius =
+      110
+
+    // Shadow / danger telegraph.
+    const shadow =
+      this.scene.add.circle(
+        targetX,
+        targetY,
+        radius,
+        0xff0000,
+        0.15
+      )
+
+    shadow.setStrokeStyle(
+      4,
+      0xff3333,
+      0.8
+    )
+
+    shadow.setScale(
+      0.25
+    )
+
+    this.scene.tweens.add({
+      targets:
+        shadow,
+
+      scale:
+        1,
+
+      alpha:
+        0.4,
+
+      duration:
+        800,
+
+      ease:
+        'Power2',
+    })
+
+    // Make Wyrm visually prepare.
+    this.scene.tweens.add({
+      targets:
+        this.wyrm,
+
+      scaleX:
+        1.2,
+
+      scaleY:
+        0.8,
+
+      duration:
+        400,
+
+      yoyo:
+        true,
+    })
+
+    // Impact after telegraph.
+    this.scene.time.delayedCall(
+      850,
+      () => {
+        if (
+          !this.player.active
+        ) {
+          shadow.destroy()
+
+          this.wyrmSlamInProgress =
+            false
+
+          return
+        }
+
+        const impact =
+          this.scene.add.circle(
+            targetX,
+            targetY,
+            radius,
+            0xff5500,
+            0.7
+          )
+
+        impact.setScale(
+          0.4
+        )
+
+        this.scene.tweens.add({
+          targets:
+            impact,
+
+          scale:
+            1.5,
+
+          alpha:
+            0,
+
+          duration:
+            300,
+
+          onComplete:
+            () => {
+              impact.destroy()
+            },
+        })
+
+        this.scene.cameras.main.shake(
+          250,
+          0.025
+        )
+
+        const playerDistance =
+          Phaser.Math.Distance.Between(
+            targetX,
+            targetY,
+            this.player.x,
+            this.player.y
+          )
+
+        if (
+          playerDistance <=
+          radius
+        ) {
+          this.onPlayerDamage(
+            30
+          )
+        }
+
+        if (
+          shadow.active
+        ) {
+          shadow.destroy()
+        }
+
+        this.wyrmSlamInProgress =
+          false
+      }
+    )
   }
 
   private checkPlayerCollision(
@@ -163,7 +602,9 @@ export class EnemyManager {
       const enemy of
         this.enemies
     ) {
-      if (!enemy.active) {
+      if (
+        !enemy.active
+      ) {
         continue
       }
 
@@ -173,12 +614,24 @@ export class EnemyManager {
           enemy.getBounds()
         )
 
-      if (!hit) {
+      if (
+        !hit
+      ) {
         continue
       }
 
+      const type =
+        this.getEnemyType(
+          enemy
+        )
+
+      const damage =
+        ENEMY_STATS[
+          type
+        ].contactDamage
+
       this.onPlayerDamage(
-        this.contactDamage
+        damage
       )
 
       this.playerDamageCooldown =
@@ -189,15 +642,22 @@ export class EnemyManager {
   }
 
   removeEnemy(
-    enemy: Phaser.GameObjects.Rectangle
+    enemy:
+      Phaser.GameObjects.Rectangle
   ) {
+    const type =
+      this.getEnemyType(
+        enemy
+      )
+
     const index =
       this.enemies.indexOf(
         enemy
       )
 
     if (
-      index !== -1
+      index !==
+      -1
     ) {
       this.enemies.splice(
         index,
@@ -208,6 +668,24 @@ export class EnemyManager {
     this.enemyHealth.delete(
       enemy
     )
+
+    this.enemyTypes.delete(
+      enemy
+    )
+
+    if (
+      type ===
+      'wyrm'
+    ) {
+      this.wyrm =
+        null
+
+      this.wyrmSlamInProgress =
+        false
+
+      this.wyrmSlamTimer =
+        0
+    }
 
     if (
       enemy.active
@@ -228,11 +706,23 @@ export class EnemyManager {
       }
     }
 
-    this.enemies = []
+    this.enemies =
+      []
 
     this.enemyHealth.clear()
 
+    this.enemyTypes.clear()
+
     this.playerDamageCooldown =
       0
+
+    this.wyrm =
+      null
+
+    this.wyrmSlamTimer =
+      0
+
+    this.wyrmSlamInProgress =
+      false
   }
 }

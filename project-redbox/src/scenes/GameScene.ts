@@ -13,6 +13,10 @@ import type {
 } from '../encounters/EncounterTypes'
 
 import {
+  ENEMY_STATS,
+} from '../enemies/EnemyTypes'
+
+import {
   createDefaultPlayerStats,
 } from '../player/PlayerStats'
 
@@ -79,6 +83,9 @@ export class GameScene
   private isGameOver =
     false
 
+  private wyrmSpawned =
+    false
+
   private playerStats =
     createDefaultPlayerStats()
 
@@ -128,6 +135,9 @@ export class GameScene
       0
 
     this.isGameOver =
+      false
+
+    this.wyrmSpawned =
       false
   }
 
@@ -179,6 +189,20 @@ export class GameScene
       350,
       0x263244
     )
+
+    this.add
+      .circle(
+        1200,
+        900,
+        300,
+        0x441111,
+        0.08
+      )
+      .setStrokeStyle(
+        3,
+        0x662222,
+        0.4
+      )
   }
 
   private createPlayer() {
@@ -208,7 +232,9 @@ export class GameScene
           this.player.getObject(),
 
         onPlayerDamage:
-          (amount) => {
+          (
+            amount
+          ) => {
             this.damagePlayer(
               amount
             )
@@ -260,7 +286,9 @@ export class GameScene
             this.enemyManager.getEnemies(),
 
         getEnemyHealth:
-          (enemy) =>
+          (
+            enemy
+          ) =>
             this.enemyManager.getEnemyHealth(
               enemy
             ),
@@ -274,17 +302,33 @@ export class GameScene
               enemy,
               health
             )
+
+            if (
+              this.enemyManager.getEnemyType(
+                enemy
+              ) ===
+              'wyrm'
+            ) {
+              this.hud.updateBossHealth(
+                health,
+                ENEMY_STATS.wyrm.health
+              )
+            }
           },
 
         killEnemy:
-          (enemy) => {
+          (
+            enemy
+          ) => {
             this.killEnemy(
               enemy
             )
           },
 
         onComboStateChange:
-          (state) => {
+          (
+            state
+          ) => {
             if (
               this.weaponSystem
                 .getCurrentWeapon() !==
@@ -295,8 +339,12 @@ export class GameScene
 
             this.hud.updateCombo(
               state.step,
-              state.progress,
-              state.failed
+              state.elapsed,
+              state.comboWindow,
+              state.perfectStart,
+              state.perfectEnd,
+              state.failed,
+              state.perfect
             )
           },
       })
@@ -312,7 +360,9 @@ export class GameScene
           this.player.getObject(),
 
         onLootCollected:
-          (type) => {
+          (
+            type
+          ) => {
             this.handleLootCollected(
               type
             )
@@ -330,9 +380,22 @@ export class GameScene
           this.player.getObject(),
 
         onEncounterTriggered:
-          (zone) => {
+          (
+            zone
+          ) =>
             this.triggerEncounter(
               zone
+            ),
+
+        onEncounterCleared:
+          (
+            _zone,
+            cleared,
+            total
+          ) => {
+            this.handleEncounterCleared(
+              cleared,
+              total
             )
           },
       })
@@ -390,6 +453,12 @@ export class GameScene
         )
       }
     )
+    this.input.keyboard!.on(
+  'keydown-FIVE',
+  () => {
+    this.spawnWyrmDebug()
+  }
+)
   }
 
   update(
@@ -436,53 +505,246 @@ export class GameScene
     )
   }
 
+  private spawnWyrmDebug() {
+  if (
+    this.isGameOver ||
+    this.enemyManager.isWyrmAlive()
+  ) {
+    return
+  }
+
+  this.wyrmSpawned =
+    true
+
+  this.hud.showEncounterMessage(
+    'DEBUG: WYRM INCOMING'
+  )
+
+  this.time.delayedCall(
+    500,
+    () => {
+      if (
+        this.isGameOver
+      ) {
+        return
+      }
+
+      this.enemyManager.spawnWyrm(
+        1200,
+        900
+      )
+
+      this.hud.showBoss(
+        ENEMY_STATS.wyrm.health,
+        ENEMY_STATS.wyrm.health
+      )
+
+      this.hud.showEncounterMessage(
+        'THE WYRM HAS LANDED'
+      )
+    }
+  )
+}
+
   private triggerEncounter(
-    zone: EncounterZone
+    zone:
+      EncounterZone
   ) {
     this.hud.showEncounterMessage(
       'HOSTILES DETECTED'
     )
 
+    const spawned:
+      Phaser.GameObjects.Rectangle[] = []
+
+    let eliteCount =
+      1
+
+    if (
+      zone.enemyCount >=
+      12
+    ) {
+      eliteCount =
+        2
+    }
+
+    if (
+      zone.enemyCount >=
+      16
+    ) {
+      eliteCount =
+        3
+    }
+
+    const normalCount =
+      Math.max(
+        0,
+        zone.enemyCount -
+          eliteCount
+      )
+
     for (
       let i = 0;
-      i < zone.enemyCount;
+      i < normalCount;
       i++
     ) {
-      const angle =
-        Phaser.Math.FloatBetween(
-          0,
-          Math.PI * 2
+      const position =
+        this.getEncounterSpawnPosition(
+          zone
         )
 
-      const distance =
-        Phaser.Math.Between(
-          100,
-          zone.radius
+      const enemy =
+        this.enemyManager.spawnAt(
+          position.x,
+          position.y,
+          'normal'
         )
 
-      const x =
+      spawned.push(
+        enemy
+      )
+    }
+
+    for (
+      let i = 0;
+      i < eliteCount;
+      i++
+    ) {
+      const position =
+        this.getEncounterSpawnPosition(
+          zone
+        )
+
+      const enemy =
+        this.enemyManager.spawnAt(
+          position.x,
+          position.y,
+          'elite'
+        )
+
+      spawned.push(
+        enemy
+      )
+    }
+
+    return spawned
+  }
+
+  private getEncounterSpawnPosition(
+    zone:
+      EncounterZone
+  ) {
+    const angle =
+      Phaser.Math.FloatBetween(
+        0,
+        Math.PI * 2
+      )
+
+    const distance =
+      Phaser.Math.Between(
+        100,
+        zone.radius
+      )
+
+    return {
+      x:
         zone.x +
         Math.cos(
           angle
         ) *
-          distance
+          distance,
 
-      const y =
+      y:
         zone.y +
         Math.sin(
           angle
         ) *
-          distance
-
-      this.enemyManager.spawnAt(
-        x,
-        y
-      )
+          distance,
     }
   }
 
+  private handleEncounterCleared(
+    cleared:
+      number,
+
+    total:
+      number
+  ) {
+    this.hud.showEncounterMessage(
+      `AREA SECURED — ${cleared}/${total}`
+    )
+
+    if (
+      cleared !==
+      total ||
+      this.wyrmSpawned
+    ) {
+      return
+    }
+
+    this.wyrmSpawned =
+      true
+
+    this.time.delayedCall(
+      1200,
+      () => {
+        this.beginWyrmEncounter()
+      }
+    )
+  }
+
+  private beginWyrmEncounter() {
+    if (
+      this.isGameOver
+    ) {
+      return
+    }
+
+    this.hud.showEncounterMessage(
+      'WARNING: WYRM DETECTED'
+    )
+
+    this.cameras.main.flash(
+      400,
+      120,
+      0,
+      0
+    )
+
+    this.cameras.main.shake(
+      300,
+      0.012
+    )
+
+    this.time.delayedCall(
+      2000,
+      () => {
+        if (
+          this.isGameOver
+        ) {
+          return
+        }
+
+        this.enemyManager.spawnWyrm(
+          1200,
+          900
+        )
+
+        this.hud.showBoss(
+          ENEMY_STATS.wyrm.health,
+          ENEMY_STATS.wyrm.health
+        )
+
+        this.hud.showEncounterMessage(
+          'THE WYRM HAS LANDED'
+        )
+      }
+    )
+  }
+
   private damagePlayer(
-    amount: number
+    amount:
+      number
   ) {
     if (
       this.isGameOver ||
@@ -551,7 +813,8 @@ export class GameScene
   }
 
   private setWeapon(
-    weapon: WeaponType
+    weapon:
+      WeaponType
   ) {
     this.weaponSystem.setWeapon(
       weapon
@@ -572,6 +835,10 @@ export class GameScene
       this.hud.updateCombo(
         0,
         0,
+        700,
+        180,
+        420,
+        false,
         false
       )
     } else {
@@ -595,23 +862,47 @@ export class GameScene
     const y =
       enemy.y
 
+    const enemyType =
+      this.enemyManager.getEnemyType(
+        enemy
+      )
+
     this.enemyManager.removeEnemy(
       enemy
     )
 
-    this.createDeathBurst(
-      x,
-      y
-    )
+    if (
+      enemyType ===
+      'wyrm'
+    ) {
+      this.handleWyrmDeath(
+        x,
+        y
+      )
+    } else {
+      this.createDeathBurst(
+        x,
+        y
+      )
 
-    this.lootSystem.tryDrop(
-      x,
-      y
-    )
+      this.lootSystem.tryDrop(
+        x,
+        y
+      )
+    }
+
+    const xpReward =
+      enemyType ===
+        'elite'
+        ? 3
+        : enemyType ===
+            'wyrm'
+          ? 20
+          : 1
 
     const gains =
       this.progression.addXP(
-        1
+        xpReward
       )
 
     if (
@@ -636,15 +927,166 @@ export class GameScene
     this.hud.updateKills(
       this.killCount
     )
+  }
+
+  private handleWyrmDeath(
+    x: number,
+    y: number
+  ) {
+    this.hud.hideBoss()
+
+    this.createWyrmDeathExplosion(
+      x,
+      y
+    )
+
+    this.cameras.main.flash(
+      500,
+      255,
+      100,
+      0
+    )
 
     this.cameras.main.shake(
-      80,
-      0.003
+      600,
+      0.035
+    )
+
+    this.hud.showEncounterMessage(
+      'WYRM TERMINATED'
+    )
+
+    this.time.delayedCall(
+      900,
+      () => {
+        this.lootSystem.spawn(
+          x,
+          y,
+          'redbox'
+        )
+      }
     )
   }
 
+  private createWyrmDeathExplosion(
+    x: number,
+    y: number
+  ) {
+    for (
+      let i = 0;
+      i < 32;
+      i++
+    ) {
+      const particle =
+        this.add.rectangle(
+          x,
+          y,
+          Phaser.Math.Between(
+            8,
+            18
+          ),
+          Phaser.Math.Between(
+            8,
+            18
+          ),
+          Phaser.Utils.Array.GetRandom([
+            0xff2200,
+            0xff6600,
+            0xffaa00,
+            0xffffff,
+          ])
+        )
+
+      const angle =
+        Phaser.Math.FloatBetween(
+          0,
+          Math.PI * 2
+        )
+
+      const distance =
+        Phaser.Math.FloatBetween(
+          150,
+          450
+        )
+
+      this.tweens.add({
+        targets:
+          particle,
+
+        x:
+          x +
+          Math.cos(
+            angle
+          ) *
+            distance,
+
+        y:
+          y +
+          Math.sin(
+            angle
+          ) *
+            distance,
+
+        rotation:
+          Phaser.Math.FloatBetween(
+            -4,
+            4
+          ),
+
+        alpha:
+          0,
+
+        scale:
+          0,
+
+        duration:
+          Phaser.Math.Between(
+            500,
+            900
+          ),
+
+        ease:
+          'Power2',
+
+        onComplete:
+          () => {
+            particle.destroy()
+          },
+      })
+    }
+
+    const blast =
+      this.add.circle(
+        x,
+        y,
+        80,
+        0xff5500,
+        0.8
+      )
+
+    this.tweens.add({
+      targets:
+        blast,
+
+      scale:
+        4,
+
+      alpha:
+        0,
+
+      duration:
+        700,
+
+      onComplete:
+        () => {
+          blast.destroy()
+        },
+    })
+  }
+
   private handleLootCollected(
-    type: LootType
+    type:
+      LootType
   ) {
     if (
       type ===
@@ -652,7 +1094,9 @@ export class GameScene
       type ===
         'scattergun' ||
       type ===
-        'cannon'
+        'cannon' ||
+      type ===
+        'greatsword'
     ) {
       this.setWeapon(
         type
@@ -680,8 +1124,11 @@ export class GameScene
   }
 
   private createDeathBurst(
-    x: number,
-    y: number
+    x:
+      number,
+
+    y:
+      number
   ) {
     for (
       let i = 0;

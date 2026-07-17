@@ -10,9 +10,24 @@ interface EncounterManagerConfig {
   player:
     Phaser.GameObjects.Rectangle
 
-  onEncounterTriggered: (
-    zone: EncounterZone
-  ) => void
+  onEncounterTriggered:
+    (
+      zone:
+        EncounterZone
+    ) =>
+      Phaser.GameObjects.Rectangle[]
+
+  onEncounterCleared?:
+    (
+      zone:
+        EncounterZone,
+
+      clearedCount:
+        number,
+
+      totalCount:
+        number
+    ) => void
 }
 
 export class EncounterManager {
@@ -25,11 +40,26 @@ export class EncounterManager {
   private zones:
     EncounterZone[] = []
 
+  private encounterEnemies =
+    new Map<
+      EncounterZone,
+      Phaser.GameObjects.Rectangle[]
+    >()
+
+  private clearedZones =
+    new Set<
+      EncounterZone
+    >()
+
   private onEncounterTriggered:
     EncounterManagerConfig['onEncounterTriggered']
 
+  private onEncounterCleared?:
+    EncounterManagerConfig['onEncounterCleared']
+
   constructor(
-    config: EncounterManagerConfig
+    config:
+      EncounterManagerConfig
   ) {
     this.scene =
       config.scene
@@ -39,6 +69,9 @@ export class EncounterManager {
 
     this.onEncounterTriggered =
       config.onEncounterTriggered
+
+    this.onEncounterCleared =
+      config.onEncounterCleared
 
     this.createZones()
   }
@@ -117,6 +150,12 @@ export class EncounterManager {
       return
     }
 
+    this.checkZoneTriggers()
+
+    this.checkClearedEncounters()
+  }
+
+  private checkZoneTriggers() {
     for (
       const zone of
         this.zones
@@ -145,10 +184,82 @@ export class EncounterManager {
       zone.triggered =
         true
 
-      this.onEncounterTriggered(
-        zone
+      const spawnedEnemies =
+        this.onEncounterTriggered(
+          zone
+        )
+
+      this.encounterEnemies.set(
+        zone,
+        spawnedEnemies
       )
     }
+  }
+
+  private checkClearedEncounters() {
+    for (
+      const zone of
+        this.zones
+    ) {
+      if (
+        !zone.triggered ||
+        this.clearedZones.has(
+          zone
+        )
+      ) {
+        continue
+      }
+
+      const enemies =
+        this.encounterEnemies.get(
+          zone
+        )
+
+      if (
+        !enemies
+      ) {
+        continue
+      }
+
+      const enemiesRemaining =
+        enemies.some(
+          (
+            enemy
+          ) =>
+            enemy.active
+        )
+
+      if (
+        enemiesRemaining
+      ) {
+        continue
+      }
+
+      this.clearedZones.add(
+        zone
+      )
+
+      this.onEncounterCleared?.(
+        zone,
+        this.clearedZones.size,
+        this.zones.length
+      )
+    }
+  }
+
+  getClearedCount() {
+    return this.clearedZones.size
+  }
+
+  getTotalCount() {
+    return this.zones.length
+  }
+
+  allEncountersCleared() {
+    return (
+      this.clearedZones.size ===
+      this.zones.length
+    )
   }
 
   reset() {
@@ -159,9 +270,9 @@ export class EncounterManager {
       zone.triggered =
         false
     }
-  }
 
-  getZones() {
-    return this.zones
+    this.encounterEnemies.clear()
+
+    this.clearedZones.clear()
   }
 }

@@ -21,8 +21,6 @@ export class HUD {
   private weaponText!:
     Phaser.GameObjects.Text
 
-  private xpBarBackground!:
-    Phaser.GameObjects.Rectangle
 
   private xpBarFill!:
     Phaser.GameObjects.Rectangle
@@ -30,17 +28,45 @@ export class HUD {
   private xpText!:
     Phaser.GameObjects.Text
 
+  // COMBO UI
+
   private comboBoxes:
     Phaser.GameObjects.Rectangle[] = []
 
   private comboLabels:
     Phaser.GameObjects.Text[] = []
 
-  private comboBarBackground!:
+  private comboTimelineBackground!:
     Phaser.GameObjects.Rectangle
 
-  private comboBarFill!:
+  private comboEarlyZone!:
     Phaser.GameObjects.Rectangle
+
+  private comboPerfectZone!:
+    Phaser.GameObjects.Rectangle
+
+  private comboLateZone!:
+    Phaser.GameObjects.Rectangle
+
+  private comboMarker!:
+    Phaser.GameObjects.Rectangle
+
+  private perfectText!:
+    Phaser.GameObjects.Text
+
+  // BOSS UI
+
+  private bossNameText!:
+    Phaser.GameObjects.Text
+
+  private bossHealthBackground!:
+    Phaser.GameObjects.Rectangle
+
+  private bossHealthFill!:
+    Phaser.GameObjects.Rectangle
+
+  private bossHealthText!:
+    Phaser.GameObjects.Text
 
   constructor(
     scene: Phaser.Scene,
@@ -54,6 +80,8 @@ export class HUD {
     )
 
     this.createComboUI()
+
+    this.createBossUI()
   }
 
   private create(
@@ -117,18 +145,17 @@ export class HUD {
           0
         )
 
-    this.xpBarBackground =
-      this.scene.add
-        .rectangle(
-          400,
-          580,
-          300,
-          16,
-          0x333333
-        )
-        .setScrollFactor(
-          0
-        )
+    this.scene.add
+      .rectangle(
+        400,
+        580,
+        300,
+        16,
+        0x333333
+      )
+      .setScrollFactor(
+        0
+      )
 
     this.xpBarFill =
       this.scene.add
@@ -173,8 +200,8 @@ export class HUD {
     const startX =
       340
 
-    const y =
-      495
+    const boxY =
+      485
 
     const spacing =
       60
@@ -188,9 +215,9 @@ export class HUD {
         this.scene.add
           .rectangle(
             startX +
-              i *
-                spacing,
-            y,
+            i *
+            spacing,
+            boxY,
             42,
             42,
             0x222222,
@@ -208,9 +235,9 @@ export class HUD {
         this.scene.add
           .text(
             startX +
-              i *
-                spacing,
-            y,
+            i *
+            spacing,
+            boxY,
             `${i + 1}`,
             {
               fontSize:
@@ -236,26 +263,70 @@ export class HUD {
       )
     }
 
-    this.comboBarBackground =
+    const timelineX =
+      320
+
+    const timelineY =
+      525
+
+    const timelineWidth =
+      160
+
+    this.comboTimelineBackground =
       this.scene.add
         .rectangle(
-          400,
-          527,
-          160,
-          8,
-          0x222222
+          timelineX,
+          timelineY,
+          timelineWidth,
+          10,
+          0x111111
+        )
+        .setOrigin(
+          0,
+          0.5
         )
         .setScrollFactor(
           0
         )
 
-    this.comboBarFill =
+    const earlyWidth =
+      timelineWidth *
+      (180 / 700)
+
+    const perfectWidth =
+      timelineWidth *
+      (240 / 700)
+
+    const lateWidth =
+      timelineWidth -
+      earlyWidth -
+      perfectWidth
+
+    this.comboEarlyZone =
       this.scene.add
         .rectangle(
-          320,
-          527,
+          timelineX,
+          timelineY,
+          earlyWidth,
+          8,
+          0x663333
+        )
+        .setOrigin(
           0,
-          6,
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.comboPerfectZone =
+      this.scene.add
+        .rectangle(
+          timelineX +
+          earlyWidth,
+          timelineY,
+          perfectWidth,
+          8,
           0xffcc44
         )
         .setOrigin(
@@ -266,8 +337,213 @@ export class HUD {
           0
         )
 
+    this.comboLateZone =
+      this.scene.add
+        .rectangle(
+          timelineX +
+          earlyWidth +
+          perfectWidth,
+          timelineY,
+          lateWidth,
+          8,
+          0x555555
+        )
+        .setOrigin(
+          0,
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.comboMarker =
+      this.scene.add
+        .rectangle(
+          timelineX,
+          timelineY,
+          4,
+          18,
+          0xffffff
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.perfectText =
+      this.scene.add
+        .text(
+          400,
+          445,
+          'PERFECT',
+          {
+            fontSize:
+              '22px',
+
+            color:
+              '#ffdd55',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+        .setVisible(
+          false
+        )
+
     this.setComboVisible(
       false
+    )
+  }
+
+  private createBossUI() {
+    this.bossNameText =
+      this.scene.add
+        .text(
+          400,
+          110,
+          'THE WYRM',
+          {
+            fontSize:
+              '24px',
+
+            color:
+              '#ff5555',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.bossHealthBackground =
+      this.scene.add
+        .rectangle(
+          400,
+          140,
+          500,
+          22,
+          0x220000
+        )
+        .setStrokeStyle(
+          2,
+          0xff4444
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.bossHealthFill =
+      this.scene.add
+        .rectangle(
+          150,
+          140,
+          500,
+          18,
+          0xaa1111
+        )
+        .setOrigin(
+          0,
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.bossHealthText =
+      this.scene.add
+        .text(
+          400,
+          140,
+          '75 / 75',
+          {
+            fontSize:
+              '14px',
+
+            color:
+              '#ffffff',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    this.setBossVisible(
+      false
+    )
+  }
+
+  showBoss(
+    currentHealth: number,
+    maxHealth: number
+  ) {
+    this.setBossVisible(
+      true
+    )
+
+    this.updateBossHealth(
+      currentHealth,
+      maxHealth
+    )
+  }
+
+  updateBossHealth(
+    currentHealth: number,
+    maxHealth: number
+  ) {
+    const safeHealth =
+      Math.max(
+        0,
+        currentHealth
+      )
+
+    const progress =
+      Phaser.Math.Clamp(
+        safeHealth /
+        maxHealth,
+        0,
+        1
+      )
+
+    this.bossHealthFill.width =
+      500 *
+      progress
+
+    this.bossHealthText.setText(
+      `${safeHealth} / ${maxHealth}`
+    )
+  }
+
+  hideBoss() {
+    this.setBossVisible(
+      false
+    )
+  }
+
+  private setBossVisible(
+    visible: boolean
+  ) {
+    this.bossNameText.setVisible(
+      visible
+    )
+
+    this.bossHealthBackground.setVisible(
+      visible
+    )
+
+    this.bossHealthFill.setVisible(
+      visible
+    )
+
+    this.bossHealthText.setVisible(
+      visible
     )
   }
 
@@ -276,7 +552,7 @@ export class HUD {
   ) {
     for (
       const box of
-        this.comboBoxes
+      this.comboBoxes
     ) {
       box.setVisible(
         visible
@@ -285,20 +561,40 @@ export class HUD {
 
     for (
       const label of
-        this.comboLabels
+      this.comboLabels
     ) {
       label.setVisible(
         visible
       )
     }
 
-    this.comboBarBackground.setVisible(
+    this.comboTimelineBackground.setVisible(
       visible
     )
 
-    this.comboBarFill.setVisible(
+    this.comboEarlyZone.setVisible(
       visible
     )
+
+    this.comboPerfectZone.setVisible(
+      visible
+    )
+
+    this.comboLateZone.setVisible(
+      visible
+    )
+
+    this.comboMarker.setVisible(
+      visible
+    )
+
+    if (
+      !visible
+    ) {
+      this.perfectText.setVisible(
+        false
+      )
+    }
   }
 
   hideCombo() {
@@ -309,8 +605,12 @@ export class HUD {
 
   updateCombo(
     step: number,
-    progress: number,
-    failed: boolean
+    elapsed: number,
+    comboWindow: number,
+    perfectStart: number,
+    perfectEnd: number,
+    failed: boolean,
+    perfect: boolean
   ) {
     this.setComboVisible(
       true
@@ -321,7 +621,7 @@ export class HUD {
     ) {
       for (
         const box of
-          this.comboBoxes
+        this.comboBoxes
       ) {
         box.setFillStyle(
           0x662222
@@ -335,15 +635,16 @@ export class HUD {
 
       for (
         const label of
-          this.comboLabels
+        this.comboLabels
       ) {
         label.setColor(
           '#ff4444'
         )
       }
 
-      this.comboBarFill.width =
-        0
+      this.perfectText.setVisible(
+        false
+      )
 
       return
     }
@@ -425,13 +726,71 @@ export class HUD {
       }
     }
 
-    this.comboBarFill.width =
-      160 *
+    const progress =
       Phaser.Math.Clamp(
-        progress,
+        elapsed /
+        comboWindow,
         0,
         1
       )
+
+    this.comboMarker.x =
+      320 +
+      160 *
+      progress
+
+    const inPerfectZone =
+      elapsed >=
+      perfectStart &&
+      elapsed <=
+      perfectEnd
+
+    this.comboMarker.setFillStyle(
+      inPerfectZone
+        ? 0xffff00
+        : 0xffffff
+    )
+
+    if (
+      perfect
+    ) {
+      this.showPerfectFeedback()
+    }
+  }
+
+  private showPerfectFeedback() {
+    this.perfectText.setVisible(
+      true
+    )
+
+    this.perfectText.setAlpha(
+      1
+    )
+
+    this.perfectText.setScale(
+      1.3
+    )
+
+    this.scene.tweens.add({
+      targets:
+        this.perfectText,
+
+      alpha:
+        0,
+
+      scale:
+        1,
+
+      duration:
+        400,
+
+      onComplete:
+        () => {
+          this.perfectText.setVisible(
+            false
+          )
+        },
+    })
   }
 
   updateHealth(
@@ -488,7 +847,7 @@ export class HUD {
       this.scene.add
         .text(
           400,
-          100,
+          130,
           message,
           {
             fontSize:
@@ -513,7 +872,7 @@ export class HUD {
         0,
 
       y:
-        70,
+        100,
 
       duration:
         1200,
@@ -532,7 +891,7 @@ export class HUD {
       this.scene.add
         .text(
           400,
-          120,
+          150,
           message,
           {
             fontSize:
@@ -557,7 +916,7 @@ export class HUD {
         0,
 
       y:
-        90,
+        120,
 
       duration:
         900,
@@ -576,7 +935,7 @@ export class HUD {
       this.scene.add
         .text(
           400,
-          100,
+          130,
           'RARE WEAPON',
           {
             fontSize:
@@ -597,7 +956,7 @@ export class HUD {
       this.scene.add
         .text(
           400,
-          135,
+          165,
           weaponName,
           {
             fontSize:
@@ -642,7 +1001,6 @@ export class HUD {
       onComplete:
         () => {
           rareText.destroy()
-
           weaponText.destroy()
         },
     })
@@ -729,7 +1087,6 @@ export class HUD {
       onComplete:
         () => {
           levelText.destroy()
-
           statsText.destroy()
         },
     })
