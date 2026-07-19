@@ -149,23 +149,23 @@
 ## Day 18 — Sat 8/1
 ### INVENTORY
 
-* [ ] **Inventory data** — Player can own multiple items
-* [ ] **Inventory screen** — Press `I` to open
-* [ ] **Item list** — Display collected weapons
-* [ ] **Stats panel** — Show selected weapon stats
-* [ ] **Pause combat** — Game pauses while inventory is open
-* [ ] **Commit** — `v0.7.2 - The backpack`
+* [x] **Inventory data** — Player can own multiple items
+* [x] **Inventory screen** — Press `I` to open
+* [x] **Item list** — Display collected weapons
+* [x] **Stats panel** — Show selected weapon stats
+* [x] **Pause combat** — Game pauses while inventory is open
+* [x] **Commit** — `v0.7.2 - The backpack`
 
 ---
 
 ## Day 19 — Sun 8/2
 ### EQUIPMENT
 
-* [ ] **Equip weapon** — Select weapon from inventory
-* [ ] **Equipped slot** — Clearly show current weapon
-* [ ] **Stat comparison** — Green/red comparison against equipped weapon
-* [ ] **WeaponSystem integration** — Equipped item's stats affect combat
-* [ ] **Drop replacement removed** — Picking up loot no longer destroys your current weapon
+* [x] **Equip weapon** — Select weapon from inventory
+* [x] **Equipped slot** — Clearly show current weapon
+* [x] **Stat comparison** — Green/red comparison against equipped weapon
+* [x] **WeaponSystem integration** — Equipped item's stats affect combat
+* [x] **Drop replacement removed** — Picking up loot no longer destroys your current weapon
 * [ ] **Commit** — `v0.7.3 - Gear up`
 
 ---
