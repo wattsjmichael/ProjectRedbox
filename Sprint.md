@@ -166,7 +166,7 @@
 * [x] **Stat comparison** — Green/red comparison against equipped weapon
 * [x] **WeaponSystem integration** — Equipped item's stats affect combat
 * [x] **Drop replacement removed** — Picking up loot no longer destroys your current weapon
-* [ ] **Commit** — `v0.7.3 - Gear up`
+* [x] **Commit** — `v0.7.3 - Gear up`
 
 ---
 
