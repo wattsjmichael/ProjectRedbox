@@ -4,6 +4,10 @@ import type {
   WeaponType,
 } from './WeaponTypes'
 
+import type {
+  WeaponItem,
+} from '../items/ItemTypes'
+
 export interface ComboState {
   step: number
   elapsed: number
@@ -18,7 +22,7 @@ interface WeaponSystemConfig {
   scene: Phaser.Scene
 
   player:
-    Phaser.GameObjects.Rectangle
+  Phaser.GameObjects.Rectangle
 
   worldWidth: number
   worldHeight: number
@@ -41,6 +45,18 @@ interface WeaponSystemConfig {
 
   onComboStateChange?: (
     state: ComboState
+  ) => void
+
+  onCriticalHit?: (
+    x: number,
+    y: number
+  ) => void
+
+  onDamageDealt?: (
+    x: number,
+    y: number,
+    damage: number,
+    critical: boolean
   ) => void
 }
 
@@ -72,8 +88,20 @@ export class WeaponSystem {
   private onComboStateChange?:
     WeaponSystemConfig['onComboStateChange']
 
+  private onCriticalHit?:
+    WeaponSystemConfig['onCriticalHit']
+
+  private onDamageDealt?:
+    WeaponSystemConfig['onDamageDealt']
+
+  private enabled =
+    true
+
   private currentWeapon:
     WeaponType = 'rifle'
+
+  private equippedWeapon:
+    WeaponItem | null = null
 
   private fireTimer =
     0
@@ -88,6 +116,7 @@ export class WeaponSystem {
     >()
 
   // Greatsword rhythm
+
   private comboStep =
     0
 
@@ -113,7 +142,8 @@ export class WeaponSystem {
     0
 
   constructor(
-    config: WeaponSystemConfig
+    config:
+      WeaponSystemConfig
   ) {
     this.scene =
       config.scene
@@ -142,6 +172,12 @@ export class WeaponSystem {
     this.onComboStateChange =
       config.onComboStateChange
 
+    this.onCriticalHit =
+      config.onCriticalHit
+
+    this.onDamageDealt =
+      config.onDamageDealt
+
     this.setupMeleeInput()
   }
 
@@ -150,11 +186,12 @@ export class WeaponSystem {
       'pointerdown',
       () => {
         if (
-          this.currentWeapon !==
-          'greatsword'
-        ) {
-          return
-        }
+  !this.enabled ||
+  this.currentWeapon !==
+  'greatsword'
+) {
+  return
+}
 
         this.attackGreatsword()
       }
@@ -164,7 +201,7 @@ export class WeaponSystem {
   reset() {
     for (
       const bullet of
-        this.bullets
+      this.bullets
     ) {
       if (
         bullet.active
@@ -181,26 +218,35 @@ export class WeaponSystem {
     this.currentWeapon =
       'rifle'
 
+    this.equippedWeapon =
+      null
+
     this.fireTimer =
       0
 
     this.resetCombo()
   }
 
-  update(
-    delta: number,
-    targetX: number,
-    targetY: number
+update(
+  delta: number,
+  targetX: number,
+  targetY: number
+) {
+  if (
+    !this.enabled
   ) {
-    this.targetX =
-      targetX
+    return
+  }
 
-    this.targetY =
-      targetY
+  this.targetX =
+    targetX
 
-    this.updateCombo(
-      delta
-    )
+  this.targetY =
+    targetY
+
+  this.updateCombo(
+    delta
+  )
 
     if (
       this.currentWeapon !==
@@ -228,11 +274,34 @@ export class WeaponSystem {
     )
   }
 
+  // Used by normal loot.
+  equipWeapon(
+    item:
+      WeaponItem
+  ) {
+    this.equippedWeapon =
+      item
+
+    this.currentWeapon =
+      item.weaponType
+
+    this.fireTimer =
+      0
+
+    this.resetCombo()
+  }
+
+  // Used by debug shortcuts and
+  // special weapons such as Photon Lance.
   setWeapon(
-    weapon: WeaponType
+    weapon:
+      WeaponType
   ) {
     this.currentWeapon =
       weapon
+
+    this.equippedWeapon =
+      null
 
     this.fireTimer =
       0
@@ -242,6 +311,10 @@ export class WeaponSystem {
 
   getCurrentWeapon() {
     return this.currentWeapon
+  }
+
+  getEquippedWeapon() {
+    return this.equippedWeapon
   }
 
   private resetCombo() {
@@ -262,7 +335,23 @@ export class WeaponSystem {
         false,
     })
   }
+  setEnabled(
+    enabled: boolean
+  ) {
+    this.enabled =
+      enabled
 
+    if (
+      !enabled
+    ) {
+      this.fireTimer =
+        0
+    }
+  }
+
+  isEnabled() {
+    return this.enabled
+  }
   private emitComboState(
     options: {
       failed?: boolean
@@ -354,7 +443,6 @@ export class WeaponSystem {
       return
     }
 
-    // First attack always starts immediately.
     if (
       this.comboStep ===
       0
@@ -378,7 +466,6 @@ export class WeaponSystem {
       return
     }
 
-    // Clicking too early does not advance.
     if (
       this.comboTimer <
       this.perfectStart
@@ -390,12 +477,10 @@ export class WeaponSystem {
 
     const wasPerfect =
       this.comboTimer >=
-        this.perfectStart &&
+      this.perfectStart &&
       this.comboTimer <=
-        this.perfectEnd
+      this.perfectEnd
 
-    // We know we're still inside
-    // the overall combo window here.
     this.comboStep++
 
     this.comboTimer =
@@ -407,16 +492,16 @@ export class WeaponSystem {
     })
 
     switch (
-      this.comboStep
+    this.comboStep
     ) {
       case 2: {
-        const damage =
+        const baseDamage =
           wasPerfect
             ? 3
             : 2
 
         this.performGreatswordSwing(
-          damage,
+          baseDamage,
           115,
           85,
           240,
@@ -427,21 +512,19 @@ export class WeaponSystem {
       }
 
       case 3: {
-        const damage =
+        const baseDamage =
           wasPerfect
             ? 6
             : 4
 
         this.performGreatswordSwing(
-          damage,
+          baseDamage,
           145,
           120,
           400,
           wasPerfect
         )
 
-        // Keep final combo state
-        // visible briefly.
         this.scene.time.delayedCall(
           450,
           () => {
@@ -468,22 +551,29 @@ export class WeaponSystem {
   }
 
   private performGreatswordSwing(
-    damage: number,
+    baseDamage: number,
     range: number,
     arcDegrees: number,
-    lockDuration: number,
+    baseLockDuration: number,
     perfect: boolean
   ) {
     this.meleeLocked =
       true
 
+    const speedMultiplier =
+      this.getSpeedMultiplier()
+
+    const lockDuration =
+      baseLockDuration /
+      speedMultiplier
+
     const direction =
       new Phaser.Math.Vector2(
         this.targetX -
-          this.player.x,
+        this.player.x,
 
         this.targetY -
-          this.player.y
+        this.player.y
       )
 
     if (
@@ -513,7 +603,7 @@ export class WeaponSystem {
 
     for (
       const enemy of
-        enemies
+      enemies
     ) {
       if (
         !enemy.active
@@ -547,13 +637,13 @@ export class WeaponSystem {
       const angleDifference =
         Phaser.Math.Angle.Wrap(
           enemyAngle -
-            attackAngle
+          attackAngle
         )
 
       const halfArc =
         Phaser.Math.DegToRad(
           arcDegrees /
-            2
+          2
         )
 
       if (
@@ -567,7 +657,7 @@ export class WeaponSystem {
 
       this.damageEnemyMelee(
         enemy,
-        damage,
+        baseDamage,
         direction,
         this.comboStep,
         perfect
@@ -612,7 +702,7 @@ export class WeaponSystem {
     enemy:
       Phaser.GameObjects.Rectangle,
 
-    damage:
+    baseDamage:
       number,
 
     direction:
@@ -624,6 +714,11 @@ export class WeaponSystem {
     perfect:
       boolean
   ) {
+    const damageResult =
+      this.calculateDamage(
+        baseDamage
+      )
+
     const currentHealth =
       this.getEnemyHealth(
         enemy
@@ -631,12 +726,27 @@ export class WeaponSystem {
 
     const newHealth =
       currentHealth -
-      damage
+      damageResult.damage
 
     this.setEnemyHealth(
       enemy,
       newHealth
     )
+    this.onDamageDealt?.(
+      enemy.x,
+      enemy.y,
+      damageResult.damage,
+      damageResult.critical
+    )
+
+    if (
+      damageResult.critical
+    ) {
+      this.triggerCriticalFeedback(
+        enemy.x,
+        enemy.y
+      )
+    }
 
     if (
       newHealth <=
@@ -688,13 +798,13 @@ export class WeaponSystem {
   ) {
     const swordLength =
       this.comboStep ===
-      3
+        3
         ? 130
         : 105
 
     const swordWidth =
       this.comboStep ===
-      3
+        3
         ? 22
         : 16
 
@@ -702,7 +812,7 @@ export class WeaponSystem {
       perfect
         ? 0xffdd55
         : this.comboStep ===
-            3
+          3
           ? 0xff4444
           : 0xdddddd
 
@@ -725,7 +835,7 @@ export class WeaponSystem {
 
     sword.setRotation(
       baseAngle -
-        0.8
+      0.8
     )
 
     this.scene.tweens.add({
@@ -761,10 +871,10 @@ export class WeaponSystem {
     const direction =
       new Phaser.Math.Vector2(
         targetX -
-          this.player.x,
+        this.player.x,
 
         targetY -
-          this.player.y
+        this.player.y
       )
 
     if (
@@ -777,7 +887,7 @@ export class WeaponSystem {
     direction.normalize()
 
     switch (
-      this.currentWeapon
+    this.currentWeapon
     ) {
       case 'rifle':
         this.fireRifle(
@@ -885,7 +995,7 @@ export class WeaponSystem {
     const beamWidth =
       14
 
-    const damage =
+    const baseDamage =
       3
 
     const startX =
@@ -897,12 +1007,12 @@ export class WeaponSystem {
     const endX =
       startX +
       direction.x *
-        beamLength
+      beamLength
 
     const endY =
       startY +
       direction.y *
-        beamLength
+      beamLength
 
     const beam =
       this.scene.add.rectangle(
@@ -956,7 +1066,7 @@ export class WeaponSystem {
 
     for (
       const enemy of
-        enemies
+      enemies
     ) {
       if (
         !enemy.active
@@ -983,6 +1093,11 @@ export class WeaponSystem {
         continue
       }
 
+      const damageResult =
+        this.calculateDamage(
+          baseDamage
+        )
+
       const currentHealth =
         this.getEnemyHealth(
           enemy
@@ -990,12 +1105,27 @@ export class WeaponSystem {
 
       const newHealth =
         currentHealth -
-        damage
+        damageResult.damage
 
       this.setEnemyHealth(
         enemy,
         newHealth
       )
+      this.onDamageDealt?.(
+        enemy.x,
+        enemy.y,
+        damageResult.damage,
+        damageResult.critical
+      )
+
+      if (
+        damageResult.critical
+      ) {
+        this.triggerCriticalFeedback(
+          enemy.x,
+          enemy.y
+        )
+      }
 
       if (
         newHealth <=
@@ -1052,7 +1182,7 @@ export class WeaponSystem {
     color:
       number,
 
-    damage:
+    baseDamage:
       number,
 
     weaponType:
@@ -1077,8 +1207,8 @@ export class WeaponSystem {
     )
 
     bullet.setData(
-      'damage',
-      damage
+      'baseDamage',
+      baseDamage
     )
 
     bullet.setData(
@@ -1174,10 +1304,10 @@ export class WeaponSystem {
       if (
         bullet.x < 0 ||
         bullet.x >
-          this.worldWidth ||
+        this.worldWidth ||
         bullet.y < 0 ||
         bullet.y >
-          this.worldHeight
+        this.worldHeight
       ) {
         this.removeBullet(
           bullet,
@@ -1196,7 +1326,7 @@ export class WeaponSystem {
 
     for (
       const enemy of
-        enemies
+      enemies
     ) {
       if (
         !enemy.active
@@ -1216,20 +1346,25 @@ export class WeaponSystem {
         continue
       }
 
-      const currentHealth =
-        this.getEnemyHealth(
-          enemy
-        )
-
-      const damage =
+      const baseDamage =
         bullet.getData(
-          'damage'
+          'baseDamage'
         ) ?? 1
 
       const weaponType =
         bullet.getData(
           'weaponType'
         ) as WeaponType
+
+      const damageResult =
+        this.calculateDamage(
+          baseDamage
+        )
+
+      const currentHealth =
+        this.getEnemyHealth(
+          enemy
+        )
 
       const impactX =
         enemy.x
@@ -1239,12 +1374,28 @@ export class WeaponSystem {
 
       const newHealth =
         currentHealth -
-        damage
+        damageResult.damage
 
       this.setEnemyHealth(
         enemy,
         newHealth
       )
+
+      this.onDamageDealt?.(
+        enemy.x,
+        enemy.y,
+        damageResult.damage,
+        damageResult.critical
+      )
+
+      if (
+        damageResult.critical
+      ) {
+        this.triggerCriticalFeedback(
+          enemy.x,
+          enemy.y
+        )
+      }
 
       if (
         newHealth <=
@@ -1316,7 +1467,7 @@ export class WeaponSystem {
 
     for (
       const enemy of
-        enemies
+      enemies
     ) {
       if (
         !enemy.active
@@ -1339,19 +1490,40 @@ export class WeaponSystem {
         continue
       }
 
+      const damageResult =
+        this.calculateDamage(
+          2
+        )
+
       const currentHealth =
         this.getEnemyHealth(
           enemy
         )
 
+      this.onDamageDealt?.(
+        enemy.x,
+        enemy.y,
+        damageResult.damage,
+        damageResult.critical
+      )
+
       const newHealth =
         currentHealth -
-        2
+        damageResult.damage
 
       this.setEnemyHealth(
         enemy,
         newHealth
       )
+
+      if (
+        damageResult.critical
+      ) {
+        this.triggerCriticalFeedback(
+          enemy.x,
+          enemy.y
+        )
+      }
 
       if (
         newHealth <=
@@ -1362,6 +1534,92 @@ export class WeaponSystem {
         )
       }
     }
+  }
+
+  private calculateDamage(
+    baseDamage: number
+  ) {
+    const attackMultiplier =
+      this.getAttackMultiplier()
+
+    let damage =
+      baseDamage *
+      attackMultiplier
+
+    const criticalChance =
+      this.equippedWeapon
+        ?.criticalChance ??
+      0
+
+    const criticalDamage =
+      this.equippedWeapon
+        ?.criticalDamage ??
+      1.5
+
+    const critical =
+      Math.random() <
+      criticalChance
+
+    if (
+      critical
+    ) {
+      damage *=
+        criticalDamage
+    }
+
+    return {
+      damage:
+        Math.max(
+          1,
+          Math.round(
+            damage
+          )
+        ),
+
+      critical,
+    }
+  }
+
+  private getAttackMultiplier() {
+    if (
+      !this.equippedWeapon
+    ) {
+      return 1
+    }
+
+    return Math.max(
+      0.5,
+      this.equippedWeapon.attack /
+      10
+    )
+  }
+
+  private getSpeedMultiplier() {
+    if (
+      !this.equippedWeapon
+    ) {
+      return 1
+    }
+
+    return Math.max(
+      0.5,
+      this.equippedWeapon.speed
+    )
+  }
+
+  private triggerCriticalFeedback(
+    x: number,
+    y: number
+  ) {
+    this.onCriticalHit?.(
+      x,
+      y
+    )
+
+    this.scene.cameras.main.shake(
+      50,
+      0.005
+    )
   }
 
   private flashEnemy(
@@ -1415,23 +1673,39 @@ export class WeaponSystem {
   }
 
   private getFireRate() {
+    let baseRate:
+      number
+
     switch (
-      this.currentWeapon
+    this.currentWeapon
     ) {
       case 'rifle':
-        return 300
+        baseRate =
+          300
+        break
 
       case 'scattergun':
-        return 800
+        baseRate =
+          800
+        break
 
       case 'cannon':
-        return 1200
+        baseRate =
+          1200
+        break
 
       case 'photonLance':
-        return 900
+        baseRate =
+          900
+        break
 
       case 'greatsword':
         return Infinity
     }
+
+    return (
+      baseRate /
+      this.getSpeedMultiplier()
+    )
   }
 }

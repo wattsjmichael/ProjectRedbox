@@ -5,12 +5,12 @@ import type {
 } from '../weapons/WeaponTypes'
 
 import type {
-  LootType,
-} from '../loot/LootTypes'
-
-import type {
   EncounterZone,
 } from '../encounters/EncounterTypes'
+
+import type {
+  WeaponItem,
+} from '../items/ItemTypes'
 
 import {
   ENEMY_STATS,
@@ -47,6 +47,14 @@ import {
 import {
   HUD,
 } from '../ui/HUD'
+
+import {
+  InventorySystem,
+} from '../inventory/InventorySystem'
+
+import {
+  InventoryUI,
+} from '../inventory/InventoryUI'
 
 export class GameScene
   extends Phaser.Scene {
@@ -101,6 +109,15 @@ export class GameScene
   private progression!:
     ProgressionSystem
 
+  private inventorySystem!:
+    InventorySystem
+
+  private inventoryUI!:
+    InventoryUI
+
+  private inventoryOpen =
+    false
+
   constructor() {
     super(
       'GameScene'
@@ -122,6 +139,10 @@ export class GameScene
 
     this.createWeaponSystem()
 
+    this.createInventorySystem()
+
+    this.createInventoryUI()
+
     this.createLootSystem()
 
     this.createEncounterManager()
@@ -132,6 +153,133 @@ export class GameScene
 
     this.runStartTime =
       this.time.now
+  }
+
+  private createInventorySystem() {
+    this.inventorySystem =
+      new InventorySystem()
+      const testItems: WeaponItem[] = [
+  {
+    id: 'test-greatsword-1',
+    category: 'weapon',
+    weaponType: 'greatsword',
+    rarity: 'rare',
+    name: 'Prototype Greatsword',
+    attack: 28,
+    speed: 0.85,
+    criticalChance: 0.18,
+    criticalDamage: 2.0,
+  },
+  {
+    id: 'test-scattergun-1',
+    category: 'weapon',
+    weaponType: 'scattergun',
+    rarity: 'uncommon',
+    name: 'Enhanced Scattergun',
+    attack: 16,
+    speed: 1.15,
+    criticalChance: 0.12,
+    criticalDamage: 1.6,
+  },
+  {
+    id: 'test-cannon-1',
+    category: 'weapon',
+    weaponType: 'cannon',
+    rarity: 'rare',
+    name: 'Prototype Cannon',
+    attack: 25,
+    speed: 0.75,
+    criticalChance: 0.08,
+    criticalDamage: 2.25,
+  },
+  {
+    id: 'test-rifle-1',
+    category: 'weapon',
+    weaponType: 'rifle',
+    rarity: 'uncommon',
+    name: 'Enhanced Rifle',
+    attack: 15,
+    speed: 1.4,
+    criticalChance: 0.2,
+    criticalDamage: 1.75,
+  },
+]
+
+for (
+  const item of
+    testItems
+) {
+  this.inventorySystem.addItem(
+    item
+  )
+}
+
+    const starterRifle:
+      WeaponItem = {
+      id:
+        'starter-rifle',
+
+      category:
+        'weapon',
+
+      weaponType:
+        'rifle',
+
+      rarity:
+        'common',
+
+      name:
+        'Standard Rifle',
+
+      attack:
+        10,
+
+      speed:
+        1.2,
+
+      criticalChance:
+        0.08,
+
+      criticalDamage:
+        1.5,
+    }
+
+    this.inventorySystem.setEquippedItem(
+      starterRifle
+    )
+
+    this.weaponSystem.equipWeapon(
+      starterRifle
+    )
+
+    this.hud.updateWeapon(
+      starterRifle.name
+    )
+  }
+
+  private createInventoryUI() {
+    this.inventoryUI =
+      new InventoryUI({
+        scene:
+          this,
+
+        inventory:
+          this.inventorySystem,
+
+        onEquip:
+          (
+            item
+          ) => {
+            this.equipWeaponItem(
+              item
+            )
+          },
+
+        onClose:
+          () => {
+            this.closeInventory()
+          },
+      })
   }
 
   private resetRunState() {
@@ -365,7 +513,102 @@ export class GameScene
               state.perfect
             )
           },
+
+        onCriticalHit:
+          (
+            x,
+            y
+          ) => {
+            this.showCriticalHit(
+              x,
+              y
+            )
+          },
+
+        onDamageDealt:
+          (
+            x,
+            y,
+            damage,
+            critical
+          ) => {
+            this.showDamageNumber(
+              x,
+              y,
+              damage,
+              critical
+            )
+          },
       })
+  }
+
+
+  private showDamageNumber(
+    x: number,
+    y: number,
+    damage: number,
+    critical: boolean
+  ) {
+    const text =
+      this.add
+        .text(
+          x + Phaser.Math.Between(
+            -10,
+            10
+          ),
+          y - 20,
+          `${damage}`,
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              critical
+                ? '24px'
+                : '16px',
+
+            color:
+              critical
+                ? '#ffdd55'
+                : '#ffffff',
+
+            stroke:
+              '#000000',
+
+            strokeThickness:
+              4,
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+
+    this.tweens.add({
+      targets:
+        text,
+
+      y:
+        y - 60,
+
+      alpha:
+        0,
+
+      scale:
+        critical
+          ? 1.4
+          : 1,
+
+      duration:
+        500,
+
+      ease:
+        'Power2',
+
+      onComplete:
+        () => {
+          text.destroy()
+        },
+    })
   }
 
   private createLootSystem() {
@@ -377,13 +620,18 @@ export class GameScene
         player:
           this.player.getObject(),
 
-        onLootCollected:
+        onWeaponCollected:
           (
-            type
+            item
           ) => {
-            this.handleLootCollected(
-              type
+            this.handleWeaponCollected(
+              item
             )
+          },
+
+        onRedBoxCollected:
+          () => {
+            this.handleRedBoxCollected()
           },
       })
   }
@@ -478,6 +726,13 @@ export class GameScene
         this.spawnWyrmDebug()
       }
     )
+
+    this.input.keyboard!.on(
+      'keydown-I',
+      () => {
+        this.toggleInventory()
+      }
+    )
   }
 
   private spawnWyrmDebug() {
@@ -521,12 +776,57 @@ export class GameScene
     )
   }
 
+  private toggleInventory() {
+    if (
+      this.inventoryOpen
+    ) {
+      this.closeInventory()
+    } else {
+      this.openInventory()
+    }
+  }
+
+  private openInventory() {
+    if (
+      this.isGameOver
+    ) {
+      return
+    }
+
+    this.inventoryOpen =
+      true
+
+    this.weaponSystem.setEnabled(
+      false
+    )
+
+    this.inventoryUI.open()
+  }
+
+  private closeInventory() {
+    this.inventoryOpen =
+      false
+
+    this.weaponSystem.setEnabled(
+      true
+    )
+
+    if (
+      this.inventoryUI.isOpen()
+    ) {
+      this.inventoryUI.close(
+        false
+      )
+    }
+  }
+
   update(
     _: number,
     delta: number
   ) {
     if (
-      this.isGameOver
+      this.isGameOver ||
+      this.inventoryOpen
     ) {
       return
     }
@@ -599,7 +899,7 @@ export class GameScene
       Math.max(
         0,
         zone.enemyCount -
-          eliteCount
+        eliteCount
       )
 
     for (
@@ -665,14 +965,14 @@ export class GameScene
         Math.cos(
           angle
         ) *
-          distance,
+        distance,
 
       y:
         zone.y +
         Math.sin(
           angle
         ) *
-          distance,
+        distance,
     }
   }
 
@@ -689,7 +989,7 @@ export class GameScene
 
     if (
       cleared !==
-        total ||
+      total ||
       this.wyrmSpawned
     ) {
       return
@@ -859,6 +1159,40 @@ export class GameScene
     }
   }
 
+  private equipWeaponItem(
+    item:
+      WeaponItem
+  ) {
+    this.weaponSystem.equipWeapon(
+      item
+    )
+
+    this.hud.updateWeapon(
+      item.name
+    )
+
+    if (
+      item.weaponType ===
+      'greatsword'
+    ) {
+      this.hud.setComboVisible(
+        true
+      )
+
+      this.hud.updateCombo(
+        0,
+        0,
+        700,
+        180,
+        420,
+        false,
+        false
+      )
+    } else {
+      this.hud.hideCombo()
+    }
+  }
+
   private killEnemy(
     enemy:
       Phaser.GameObjects.Rectangle
@@ -909,7 +1243,7 @@ export class GameScene
         'elite'
         ? 3
         : enemyType ===
-            'wyrm'
+          'wyrm'
           ? 20
           : 1
 
@@ -987,59 +1321,107 @@ export class GameScene
     )
   }
 
-  private handleLootCollected(
-    type:
-      LootType
-  ) {
+private handleWeaponCollected(
+  item:
+    WeaponItem
+) {
+  this.inventorySystem.addItem(
+    item
+  )
+
+  this.hud.showLootMessage(
+    `${item.name.toUpperCase()}\n` +
+    `ADDED TO BACKPACK\n` +
+    `PRESS I TO VIEW`
+  )
+
+  console.log(
+    'Weapon added to inventory:',
+    item
+  )
+}
+
+  private handleRedBoxCollected() {
+    this.rareCount++
+
+    this.setWeapon(
+      'photonLance'
+    )
+
+    this.hud.showRareLootMessage(
+      'PHOTON LANCE'
+    )
+
     if (
-      type ===
-        'rifle' ||
-      type ===
-        'scattergun' ||
-      type ===
-        'cannon' ||
-      type ===
-        'greatsword'
+      this.awaitingBossReward
     ) {
-      this.setWeapon(
-        type
-      )
+      this.awaitingBossReward =
+        false
 
-      this.hud.showLootMessage(
-        `${type.toUpperCase()} EQUIPPED`
+      this.time.delayedCall(
+        1200,
+        () => {
+          this.completeRun()
+        }
       )
-
-      return
     }
+  }
 
-    if (
-      type ===
-      'redbox'
-    ) {
-      this.rareCount++
+  private showCriticalHit(
+    x: number,
+    y: number
+  ) {
+    const text =
+      this.add
+        .text(
+          x,
+          y - 30,
+          'CRITICAL!',
+          {
+            fontFamily:
+              'Arial Black, Arial',
 
-      this.setWeapon(
-        'photonLance'
-      )
+            fontSize:
+              '18px',
 
-      this.hud.showRareLootMessage(
-        'PHOTON LANCE'
-      )
+            color:
+              '#ffdd55',
 
-      if (
-        this.awaitingBossReward
-      ) {
-        this.awaitingBossReward =
-          false
+            stroke:
+              '#000000',
 
-        this.time.delayedCall(
-          1200,
-          () => {
-            this.completeRun()
+            strokeThickness:
+              4,
           }
         )
-      }
-    }
+        .setOrigin(
+          0.5
+        )
+
+    this.tweens.add({
+      targets:
+        text,
+
+      y:
+        y - 70,
+
+      alpha:
+        0,
+
+      scale:
+        1.3,
+
+      duration:
+        500,
+
+      ease:
+        'Power2',
+
+      onComplete:
+        () => {
+          text.destroy()
+        },
+    })
   }
 
   private completeRun() {
@@ -1114,14 +1496,14 @@ export class GameScene
           Math.cos(
             angle
           ) *
-            distance,
+          distance,
 
         y:
           y +
           Math.sin(
             angle
           ) *
-            distance,
+          distance,
 
         rotation:
           Phaser.Math.FloatBetween(
@@ -1222,14 +1604,14 @@ export class GameScene
           Math.cos(
             angle
           ) *
-            speed,
+          speed,
 
         y:
           y +
           Math.sin(
             angle
           ) *
-            speed,
+          speed,
 
         alpha:
           0,

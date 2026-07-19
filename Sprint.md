@@ -121,28 +121,28 @@
 ## Day 16 — Thu 7/30
 ### ITEM FOUNDATION
 
-* [ ] **Item model** — Create base `Item` / `WeaponItem` types
-* [ ] **Unique IDs** — Every dropped weapon becomes an individual item
-* [ ] **Weapon stats** — Add randomized base stats:
+* [x] **Item model** — Create base `Item` / `WeaponItem` types
+* [x] **Unique IDs** — Every dropped weapon becomes an individual item
+* [x] **Weapon stats** — Add randomized base stats:
   * Attack
   * Speed
   * Critical Chance
   * Critical Damage
-* [ ] **Rarity tiers** — Common / Uncommon / Rare
-* [ ] **Commit** — `v0.7.0 - Items are real`
+* [x] **Rarity tiers** — Common / Uncommon / Rare
+* [x] **Commit** — `v0.7.0 - Items are real`
 
 ---
 
 ## Day 17 — Fri 7/31
 ### RANDOMIZED WEAPONS
 
-* [ ] **Weapon generator** — Generate randomized weapon stats on drop
-* [ ] **Rifle rolls** — Different rifles can actually be better or worse
-* [ ] **Scattergun rolls**
-* [ ] **Cannon rolls**
-* [ ] **Greatsword rolls**
-* [ ] **Item names** — Generate simple names based on weapon + rarity
-* [ ] **Commit** — `v0.7.1 - Random loot`
+* [x] **Weapon generator** — Generate randomized weapon stats on drop
+* [x] **Rifle rolls** — Different rifles can actually be better or worse
+* [x] **Scattergun rolls**
+* [x] **Cannon rolls**
+* [x] **Greatsword rolls**
+* [x] **Item names** — Generate simple names based on weapon + rarity
+* [x] **Commit** — `v0.7.1 - Random loot`
 
 ---
 

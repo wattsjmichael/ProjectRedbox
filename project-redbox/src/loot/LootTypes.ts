@@ -1,14 +1,11 @@
 import type Phaser from 'phaser'
 
 import type {
-  WeaponType,
-} from '../weapons/WeaponTypes'
+  WeaponItem,
+} from '../items/ItemTypes'
 
 export type LootType =
-  | Exclude<
-      WeaponType,
-      'photonLance'
-    >
+  | 'weapon'
   | 'redbox'
 
 export interface LootDrop {
@@ -17,4 +14,7 @@ export interface LootDrop {
 
   type:
     LootType
+
+  item?:
+    WeaponItem
 }

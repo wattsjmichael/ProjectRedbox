@@ -1,20 +1,36 @@
 import Phaser from 'phaser'
 
+import type {
+  WeaponType,
+} from '../weapons/WeaponTypes'
+
+import type {
+  WeaponItem,
+} from '../items/ItemTypes'
+
+import {
+  ItemGenerator,
+} from '../items/ItemGenerator'
 
 import type {
   LootDrop,
-  LootType,
 } from './LootTypes'
 
 interface LootSystemConfig {
-  scene: Phaser.Scene
+  scene:
+    Phaser.Scene
 
   player:
-  Phaser.GameObjects.Rectangle
+    Phaser.GameObjects.Rectangle
 
-  onLootCollected: (
-    type: LootType
-  ) => void
+  onWeaponCollected:
+    (
+      item:
+        WeaponItem
+    ) => void
+
+  onRedBoxCollected:
+    () => void
 }
 
 export class LootSystem {
@@ -27,11 +43,15 @@ export class LootSystem {
   private lootDrops:
     LootDrop[] = []
 
-  private onLootCollected:
-    LootSystemConfig['onLootCollected']
+  private onWeaponCollected:
+    LootSystemConfig['onWeaponCollected']
+
+  private onRedBoxCollected:
+    LootSystemConfig['onRedBoxCollected']
 
   constructor(
-    config: LootSystemConfig
+    config:
+      LootSystemConfig
   ) {
     this.scene =
       config.scene
@@ -39,8 +59,11 @@ export class LootSystem {
     this.player =
       config.player
 
-    this.onLootCollected =
-      config.onLootCollected
+    this.onWeaponCollected =
+      config.onWeaponCollected
+
+    this.onRedBoxCollected =
+      config.onRedBoxCollected
   }
 
   update() {
@@ -65,46 +88,50 @@ export class LootSystem {
       roll <
       0.05
     ) {
-      this.spawn(
+      this.spawnRedBox(
         x,
-        y,
-        'redbox'
+        y
       )
 
       return
     }
 
     // Additional 20%
-    // normal weapon drop.
+    // normal randomized weapon
     if (
       roll <
       0.25
     ) {
-      const weapons:
-        LootType[] = [
+      const weaponTypes:
+        WeaponType[] = [
           'rifle',
           'scattergun',
           'cannon',
-          'greatsword'
+          'greatsword',
         ]
 
-      const weapon =
+      const weaponType =
         Phaser.Utils.Array.GetRandom(
-          weapons
+          weaponTypes
         )
 
-      this.spawn(
+      const item =
+        ItemGenerator.generateWeapon(
+          weaponType
+        )
+
+      this.spawnWeapon(
         x,
         y,
-        weapon
+        item
       )
     }
   }
 
-  spawn(
+  spawnWeapon(
     x: number,
     y: number,
-    type: LootType
+    item: WeaponItem
   ) {
     let color =
       0xffffff
@@ -113,7 +140,7 @@ export class LootSystem {
       18
 
     switch (
-    type
+      item.weaponType
     ) {
       case 'rifle':
         color =
@@ -130,20 +157,17 @@ export class LootSystem {
           0xff4444
         break
 
-      case 'redbox':
-        color =
-          0xff0000
-
-        size =
-          22
-        break
-
       case 'greatsword':
         color =
           0xdddddd
 
         size =
           26
+        break
+
+      case 'photonLance':
+        color =
+          0x00ffff
         break
     }
 
@@ -158,15 +182,53 @@ export class LootSystem {
 
     this.lootDrops.push({
       object,
-      type,
+
+      type:
+        'weapon',
+
+      item,
+    })
+  }
+
+  spawnRedBox(
+    x: number,
+    y: number
+  ) {
+    const object =
+      this.scene.add.rectangle(
+        x,
+        y,
+        22,
+        22,
+        0xff0000
+      )
+
+    this.lootDrops.push({
+      object,
+
+      type:
+        'redbox',
     })
 
+    this.createRedBoxEffect(
+      object
+    )
+  }
+
+  // Compatibility with your existing
+  // Wyrm guaranteed drop call:
+  spawn(
+    x: number,
+    y: number,
+    type: 'redbox'
+  ) {
     if (
       type ===
       'redbox'
     ) {
-      this.createRedBoxEffect(
-        object
+      this.spawnRedBox(
+        x,
+        y
       )
     }
   }
@@ -182,7 +244,9 @@ export class LootSystem {
       i--
     ) {
       const loot =
-        this.lootDrops[i]
+        this.lootDrops[
+          i
+        ]
 
       if (
         !loot.object.active
@@ -207,10 +271,7 @@ export class LootSystem {
         continue
       }
 
-      const type =
-        loot.type
-
-      this.destroyLoot(
+      this.collectLoot(
         loot
       )
 
@@ -218,22 +279,47 @@ export class LootSystem {
         i,
         1
       )
+    }
+  }
 
-      this.onLootCollected(
-        type
+  private collectLoot(
+    loot:
+      LootDrop
+  ) {
+    this.destroyLoot(
+      loot
+    )
+
+    if (
+      loot.type ===
+        'weapon' &&
+      loot.item
+    ) {
+      this.onWeaponCollected(
+        loot.item
       )
+
+      return
+    }
+
+    if (
+      loot.type ===
+      'redbox'
+    ) {
+      this.onRedBoxCollected()
     }
   }
 
   private destroyLoot(
-    loot: LootDrop
+    loot:
+      LootDrop
   ) {
     const beam =
       loot.object.getData(
         'beam'
       ) as
-      | Phaser.GameObjects.Rectangle
-      | undefined
+        | Phaser.GameObjects.Rectangle
+        | undefined
 
     if (
       beam?.active
@@ -276,7 +362,7 @@ export class LootSystem {
       this.scene.add.rectangle(
         redBox.x,
         redBox.y -
-        60,
+          60,
         6,
         120,
         0xff0000,
@@ -321,7 +407,7 @@ export class LootSystem {
   destroyAll() {
     for (
       const loot of
-      this.lootDrops
+        this.lootDrops
     ) {
       this.destroyLoot(
         loot
