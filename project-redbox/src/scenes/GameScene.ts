@@ -454,7 +454,7 @@ export class GameScene
         .toUpperCase()
 
     let message =
-      `RB-01 FED\n` +
+      `${item.name.toUpperCase()} FED TO RB-01\n` +
       `+${result.statGained} ${statName}\n` +
       `+${result.experienceGained} XP`
 
@@ -748,10 +748,10 @@ export class GameScene
             state
           ) => {
             if (
-              this.weaponSystem
-                .getCurrentWeapon() !==
-              'greatsword'
+              state.step === 0 &&
+              !state.failed
             ) {
+              this.hud.hideCombo()
               return
             }
 
@@ -1428,26 +1428,7 @@ export class GameScene
       weapon
     )
 
-    if (
-      weapon ===
-      'greatsword'
-    ) {
-      this.hud.setComboVisible(
-        true
-      )
-
-      this.hud.updateCombo(
-        0,
-        0,
-        700,
-        180,
-        420,
-        false,
-        false
-      )
-    } else {
-      this.hud.hideCombo()
-    }
+    this.hud.hideCombo()
   }
 
   private equipWeaponItem(
@@ -1462,26 +1443,7 @@ export class GameScene
       item.name
     )
 
-    if (
-      item.weaponType ===
-      'greatsword'
-    ) {
-      this.hud.setComboVisible(
-        true
-      )
-
-      this.hud.updateCombo(
-        0,
-        0,
-        700,
-        180,
-        420,
-        false,
-        false
-      )
-    } else {
-      this.hud.hideCombo()
-    }
+    this.hud.hideCombo()
 
     this.savePersistentState()
   }

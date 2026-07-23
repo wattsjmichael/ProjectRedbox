@@ -357,6 +357,27 @@ export class EnemyManager {
         continue
       }
 
+      const hitStopRemaining =
+        Number(
+          enemy.getData(
+            'hitStopRemaining'
+          ) ?? 0
+        )
+
+      if (
+        hitStopRemaining > 0
+      ) {
+        enemy.setData(
+          'hitStopRemaining',
+          Math.max(
+            0,
+            hitStopRemaining -
+            delta
+          )
+        )
+        continue
+      }
+
       const type =
         this.getEnemyType(
           enemy

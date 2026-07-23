@@ -742,9 +742,52 @@ export class HUD {
         1
       )
 
+    const timelineWidth =
+      160
+    const earlyWidth =
+      timelineWidth *
+      Phaser.Math.Clamp(
+        perfectStart /
+        comboWindow,
+        0,
+        1
+      )
+    const perfectWidth =
+      timelineWidth *
+      Phaser.Math.Clamp(
+        (
+          perfectEnd -
+          perfectStart
+        ) /
+        comboWindow,
+        0,
+        1
+      )
+    const lateWidth =
+      Math.max(
+        0,
+        timelineWidth -
+        earlyWidth -
+        perfectWidth
+      )
+
+    this.comboEarlyZone.width =
+      earlyWidth
+    this.comboPerfectZone.x =
+      560 +
+      earlyWidth
+    this.comboPerfectZone.width =
+      perfectWidth
+    this.comboLateZone.x =
+      560 +
+      earlyWidth +
+      perfectWidth
+    this.comboLateZone.width =
+      lateWidth
+
     this.comboMarker.x =
       560 +
-      160 *
+      timelineWidth *
       progress
 
     const inPerfectZone =
@@ -922,6 +965,15 @@ export class HUD {
           0
         )
 
+    text.setScale(
+      0.86
+    )
+
+    this.scene.cameras.main.shake(
+      45,
+      0.0015
+    )
+
     this.scene.tweens.add({
       targets:
         text,
@@ -931,6 +983,9 @@ export class HUD {
 
       y:
         150,
+
+      scale:
+        1,
 
       duration:
         900,

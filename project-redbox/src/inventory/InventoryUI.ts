@@ -930,6 +930,31 @@ export class InventoryUI {
         item.rarity
       )
 
+    const equipped =
+      this.inventory
+        .getEquippedItem()
+
+    const comparison =
+      (
+        selected:
+          number,
+        equippedValue:
+          number | undefined
+      ) => {
+        if (
+          equippedValue ===
+          undefined
+        ) {
+          return ''
+        }
+
+        const difference =
+          selected -
+          equippedValue
+
+        return `  ${difference >= 0 ? '+' : ''}${difference.toFixed(2)}`
+      }
+
     const name =
       this.scene.add
         .text(
@@ -971,7 +996,7 @@ export class InventoryUI {
         .text(
           570,
           315,
-          item.weaponType.toUpperCase(),
+          `${item.weaponType.toUpperCase()}  //  AFFIX ${item.affix?.toUpperCase() ?? 'NONE'}`,
           {
             fontFamily:
               'Arial',
@@ -990,16 +1015,16 @@ export class InventoryUI {
           570,
           365,
           [
-            `ATTACK          ${item.attack}`,
-            `SPEED           ${item.speed}`,
+            `ATTACK          ${item.attack}${comparison(item.attack, equipped?.attack)}`,
+            `SPEED           ${item.speed}${comparison(item.speed, equipped?.speed)}`,
             `CRIT CHANCE     ${(
               item.criticalChance *
               100
-            ).toFixed(0)}%`,
+            ).toFixed(0)}%${comparison(item.criticalChance * 100, equipped ? equipped.criticalChance * 100 : undefined)}`,
             `CRIT DAMAGE     ${(
               item.criticalDamage *
               100
-            ).toFixed(0)}%`,
+            ).toFixed(0)}%${comparison(item.criticalDamage * 100, equipped ? equipped.criticalDamage * 100 : undefined)}`,
           ].join(
             '\n\n'
           ),

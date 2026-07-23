@@ -8,6 +8,18 @@ import type {
   WeaponItem,
 } from '../items/ItemTypes'
 
+import {
+  WEAPON_COMBO_TIMINGS,
+} from './WeaponComboConfig'
+
+import {
+  ENEMY_STATS,
+} from '../enemies/EnemyTypes'
+
+import type {
+  EnemyType,
+} from '../enemies/EnemyTypes'
+
 export interface ComboState {
   step: number
   elapsed: number
@@ -121,9 +133,6 @@ private getMagEnergyMultiplier:
   private equippedWeapon:
     WeaponItem | null = null
 
-  private fireTimer =
-    0
-
   private bullets:
     Phaser.GameObjects.Rectangle[] = []
 
@@ -133,7 +142,7 @@ private getMagEnergyMultiplier:
       Phaser.Math.Vector2
     >()
 
-  // Greatsword rhythm
+  // Shared three-step attack rhythm.
 
   private comboStep =
     0
@@ -141,14 +150,8 @@ private getMagEnergyMultiplier:
   private comboTimer =
     0
 
-  private readonly comboWindow =
-    700
-
-  private readonly perfectStart =
-    180
-
-  private readonly perfectEnd =
-    420
+  private inputQueued =
+    false
 
   private meleeLocked =
     false
@@ -205,22 +208,28 @@ this.getMagCriticalChanceBonus =
 this.getMagEnergyMultiplier =
   config.getMagEnergyMultiplier
 
-    this.setupMeleeInput()
+    this.setupAttackInput()
   }
 
-  private setupMeleeInput() {
+  private setupAttackInput() {
     this.scene.input.on(
       'pointerdown',
-      () => {
+      (
+        pointer:
+          Phaser.Input.Pointer
+      ) => {
         if (
-  !this.enabled ||
-  this.currentWeapon !==
-  'greatsword'
-) {
-  return
-}
+          !this.enabled
+        ) {
+          return
+        }
 
-        this.attackGreatsword()
+        this.targetX =
+          pointer.worldX
+        this.targetY =
+          pointer.worldY
+
+        this.handleAttackInput()
       }
     )
   }
@@ -248,9 +257,6 @@ this.getMagEnergyMultiplier =
     this.equippedWeapon =
       null
 
-    this.fireTimer =
-      0
-
     this.resetCombo()
   }
 
@@ -275,27 +281,6 @@ update(
     delta
   )
 
-    if (
-      this.currentWeapon !==
-      'greatsword'
-    ) {
-      this.fireTimer +=
-        delta
-
-      if (
-        this.fireTimer >=
-        this.getFireRate()
-      ) {
-        this.fireAt(
-          targetX,
-          targetY
-        )
-
-        this.fireTimer =
-          0
-      }
-    }
-
     this.moveBullets(
       delta
     )
@@ -312,9 +297,6 @@ update(
     this.currentWeapon =
       item.weaponType
 
-    this.fireTimer =
-      0
-
     this.resetCombo()
   }
 
@@ -329,9 +311,6 @@ update(
 
     this.equippedWeapon =
       null
-
-    this.fireTimer =
-      0
 
     this.resetCombo()
   }
@@ -350,6 +329,9 @@ update(
 
     this.comboTimer =
       0
+
+    this.inputQueued =
+      false
 
     this.meleeLocked =
       false
@@ -371,8 +353,7 @@ update(
     if (
       !enabled
     ) {
-      this.fireTimer =
-        0
+      this.resetCombo()
     }
   }
 
@@ -385,6 +366,9 @@ update(
       perfect?: boolean
     } = {}
   ) {
+    const timing =
+      this.getCurrentTiming()
+
     this.onComboStateChange?.({
       step:
         this.comboStep,
@@ -393,13 +377,20 @@ update(
         this.comboTimer,
 
       comboWindow:
-        this.comboWindow,
+        timing.latestComboInput,
 
       perfectStart:
-        this.perfectStart,
+        timing.earliestNextInput,
 
       perfectEnd:
-        this.perfectEnd,
+        this.currentWeapon ===
+          'greatsword'
+          ? Math.min(
+            420 /
+            this.getSpeedMultiplier(),
+            timing.latestComboInput
+          )
+          : timing.latestComboInput,
 
       failed:
         options.failed ??
@@ -415,13 +406,6 @@ update(
     delta: number
   ) {
     if (
-      this.currentWeapon !==
-      'greatsword'
-    ) {
-      return
-    }
-
-    if (
       this.comboStep ===
       0
     ) {
@@ -433,39 +417,39 @@ update(
 
     this.emitComboState()
 
+    const timing =
+      this.getCurrentTiming()
+
+    if (
+      this.inputQueued &&
+      this.comboStep < 3 &&
+      this.comboTimer >=
+        timing.earliestNextInput &&
+      !this.meleeLocked
+    ) {
+      this.advanceCombo()
+      return
+    }
+
+    const resetTime =
+      this.comboStep === 3
+        ? timing.attackDuration +
+          timing.finisherRecovery
+        : timing.latestComboInput
+
     if (
       this.comboTimer >
-      this.comboWindow
+      resetTime
     ) {
-      this.comboStep =
-        0
-
-      this.comboTimer =
-        0
-
-      this.emitComboState({
-        failed:
-          true,
-      })
-
-      this.scene.time.delayedCall(
-        250,
-        () => {
-          if (
-            this.currentWeapon ===
-            'greatsword'
-          ) {
-            this.emitComboState()
-          }
-        }
+      this.failAndResetCombo(
+        this.comboStep < 3
       )
     }
   }
 
-  private attackGreatsword() {
+  private handleAttackInput() {
     if (
-      !this.player.active ||
-      this.meleeLocked
+      !this.player.active
     ) {
       return
     }
@@ -474,106 +458,163 @@ update(
       this.comboStep ===
       0
     ) {
-      this.comboStep =
-        1
-
-      this.comboTimer =
-        0
-
-      this.emitComboState()
-
-      this.performGreatswordSwing(
+      this.performComboAttack(
         1,
-        95,
-        65,
-        180,
         false
       )
-
       return
     }
 
     if (
-      this.comboTimer <
-      this.perfectStart
+      this.comboStep >= 3 ||
+      this.inputQueued
     ) {
-      this.emitComboState()
-
       return
     }
 
-    const wasPerfect =
+    const timing =
+      this.getCurrentTiming()
+
+    if (
+      this.comboTimer <
+      timing.earliestNextInput ||
+      this.meleeLocked
+    ) {
+      this.inputQueued =
+        true
+      return
+    }
+
+    if (
+      this.comboTimer >
+      timing.latestComboInput
+    ) {
+      this.resetCombo()
+      this.performComboAttack(
+        1,
+        false
+      )
+      return
+    }
+
+    this.advanceCombo()
+  }
+
+  private advanceCombo() {
+    const perfect =
+      this.currentWeapon ===
+        'greatsword' &&
       this.comboTimer >=
-      this.perfectStart &&
+        this.getCurrentTiming()
+          .earliestNextInput &&
       this.comboTimer <=
-      this.perfectEnd
+        420 /
+        this.getSpeedMultiplier()
 
-    this.comboStep++
+    this.performComboAttack(
+      this.comboStep + 1,
+      perfect
+    )
+  }
 
+  private performComboAttack(
+    step: number,
+    perfect: boolean
+  ) {
+    this.comboStep =
+      step
     this.comboTimer =
       0
+    this.inputQueued =
+      false
 
     this.emitComboState({
-      perfect:
-        wasPerfect,
+      perfect,
     })
 
     switch (
-    this.comboStep
+      this.currentWeapon
     ) {
-      case 2: {
-        const baseDamage =
-          wasPerfect
-            ? 3
-            : 2
+      case 'greatsword':
+        this.performGreatswordComboStep(
+          step,
+          perfect
+        )
+        break
+      default:
+        this.fireAt(
+          this.targetX,
+          this.targetY,
+          step
+        )
+        break
+    }
+  }
 
+  private performGreatswordComboStep(
+    step: number,
+    perfect: boolean
+  ) {
+    switch (step) {
+      case 1:
         this.performGreatswordSwing(
-          baseDamage,
+          1,
+          95,
+          65,
+          180,
+          false
+        )
+        break
+      case 2:
+        this.performGreatswordSwing(
+          perfect
+            ? 3
+            : 2,
           115,
           85,
           240,
-          wasPerfect
+          perfect
         )
-
         break
-      }
-
-      case 3: {
-        const baseDamage =
-          wasPerfect
-            ? 6
-            : 4
-
+      case 3:
         this.performGreatswordSwing(
-          baseDamage,
+          perfect
+            ? 6
+            : 4,
           145,
           120,
           400,
-          wasPerfect
+          perfect
         )
+        break
+    }
+  }
 
-        this.scene.time.delayedCall(
-          450,
-          () => {
-            if (
-              this.currentWeapon !==
-              'greatsword'
-            ) {
-              return
-            }
+  private failAndResetCombo(
+    failed: boolean
+  ) {
+    this.comboStep =
+      0
+    this.comboTimer =
+      0
+    this.inputQueued =
+      false
 
-            this.comboStep =
-              0
+    this.emitComboState({
+      failed,
+    })
 
-            this.comboTimer =
-              0
-
+    if (failed) {
+      this.scene.time.delayedCall(
+        180,
+        () => {
+          if (
+            this.comboStep === 0
+          ) {
             this.emitComboState()
           }
-        )
-
-        break
-      }
+        }
+      )
     }
   }
 
@@ -787,7 +828,8 @@ update(
     }
 
     this.flashEnemy(
-      enemy
+      enemy,
+      comboStep
     )
 
     let knockback =
@@ -887,7 +929,8 @@ update(
 
   private fireAt(
     targetX: number,
-    targetY: number
+    targetY: number,
+    comboStep: number
   ) {
     if (
       !this.player.active
@@ -918,25 +961,29 @@ update(
     ) {
       case 'rifle':
         this.fireRifle(
-          direction
+          direction,
+          comboStep
         )
         break
 
       case 'scattergun':
         this.fireScattergun(
-          direction
+          direction,
+          comboStep
         )
         break
 
       case 'cannon':
         this.fireCannon(
-          direction
+          direction,
+          comboStep
         )
         break
 
       case 'photonLance':
         this.firePhotonLance(
-          direction
+          direction,
+          comboStep
         )
         break
 
@@ -947,28 +994,64 @@ update(
 
   private fireRifle(
     direction:
-      Phaser.Math.Vector2
+      Phaser.Math.Vector2,
+    comboStep:
+      number
   ) {
+    const multiplier =
+      this.getComboDamageMultiplier(
+        comboStep
+      )
+
     this.createBullet(
       direction,
       500,
-      12,
-      4,
-      0xffff00,
-      1,
-      'rifle'
+      comboStep === 3 ? 17 : 12,
+      comboStep === 3 ? 6 : 4,
+      comboStep === 3
+        ? 0xffffff
+        : 0xffff00,
+      multiplier,
+      'rifle',
+      comboStep
     )
+
+    this.createMuzzleFlash(
+      direction,
+      comboStep,
+      0xffff55
+    )
+
+    if (comboStep === 3) {
+      this.scene.cameras.main.shake(
+        55,
+        0.003
+      )
+    }
   }
 
   private fireScattergun(
     direction:
-      Phaser.Math.Vector2
+      Phaser.Math.Vector2,
+    comboStep:
+      number
   ) {
     const pelletCount =
-      5
+      comboStep === 3
+        ? 7
+        : comboStep === 2
+          ? 6
+          : 5
 
     const spread =
-      0.35
+      comboStep === 1
+        ? 0.35
+        : 0.44
+
+    const multiplier =
+      this.getComboDamageMultiplier(
+        comboStep
+      )
 
     for (
       let i = 0;
@@ -991,39 +1074,85 @@ update(
         8,
         4,
         0xffaa00,
-        1,
-        'scattergun'
+        multiplier,
+        'scattergun',
+        comboStep
+      )
+    }
+
+    this.createMuzzleFlash(
+      direction,
+      comboStep,
+      0xffaa00
+    )
+
+    if (comboStep === 3) {
+      this.scene.cameras.main.shake(
+        90,
+        0.008
       )
     }
   }
 
   private fireCannon(
     direction:
-      Phaser.Math.Vector2
+      Phaser.Math.Vector2,
+    comboStep:
+      number
   ) {
     this.createBullet(
       direction,
       250,
-      18,
-      18,
-      0xff4444,
-      3,
-      'cannon'
+      comboStep === 3 ? 24 : 18,
+      comboStep === 3 ? 24 : 18,
+      comboStep === 3
+        ? 0xffaa44
+        : 0xff4444,
+      3 *
+      this.getComboDamageMultiplier(
+        comboStep
+      ),
+      'cannon',
+      comboStep
+    )
+
+    this.createMuzzleFlash(
+      direction,
+      comboStep,
+      0xff5533
+    )
+
+    this.scene.cameras.main.shake(
+      comboStep === 3
+        ? 150
+        : 65,
+      comboStep === 3
+        ? 0.012
+        : 0.004
     )
   }
 
   private firePhotonLance(
     direction:
-      Phaser.Math.Vector2
+      Phaser.Math.Vector2,
+    comboStep:
+      number
   ) {
     const beamLength =
       1000
 
     const beamWidth =
-      14
+      comboStep === 3
+        ? 22
+        : comboStep === 2
+          ? 17
+          : 14
 
     const baseDamage =
-      3
+      3 *
+      this.getComboDamageMultiplier(
+        comboStep
+      )
 
     const startX =
       this.player.x
@@ -1047,7 +1176,9 @@ update(
         startY,
         beamLength,
         beamWidth,
-        0x00ffff,
+        comboStep === 3
+          ? 0x88ffff
+          : 0x00ffff,
         0.9
       )
 
@@ -1163,7 +1294,8 @@ update(
         )
       } else {
         this.flashEnemy(
-          enemy
+          enemy,
+          comboStep
         )
       }
     }
@@ -1188,8 +1320,12 @@ update(
     })
 
     this.scene.cameras.main.shake(
-      80,
-      0.003
+      comboStep === 3
+        ? 130
+        : 70,
+      comboStep === 3
+        ? 0.009
+        : 0.003
     )
   }
 
@@ -1213,7 +1349,10 @@ update(
       number,
 
     weaponType:
-      WeaponType
+      WeaponType,
+
+    comboStep:
+      number
   ) {
     const bullet =
       this.scene.add.rectangle(
@@ -1241,6 +1380,11 @@ update(
     bullet.setData(
       'weaponType',
       weaponType
+    )
+
+    bullet.setData(
+      'comboStep',
+      comboStep
     )
 
     this.bullets.push(
@@ -1383,6 +1527,11 @@ update(
           'weaponType'
         ) as WeaponType
 
+      const comboStep =
+        bullet.getData(
+          'comboStep'
+        ) ?? 1
+
       const damageResult =
         this.calculateDamage(
           baseDamage
@@ -1433,7 +1582,8 @@ update(
         )
       } else {
         this.flashEnemy(
-          enemy
+          enemy,
+          comboStep
         )
       }
 
@@ -1443,7 +1593,8 @@ update(
       ) {
         this.createCannonExplosion(
           impactX,
-          impactY
+          impactY,
+          comboStep
         )
       }
 
@@ -1455,10 +1606,13 @@ update(
 
   private createCannonExplosion(
     x: number,
-    y: number
+    y: number,
+    comboStep: number
   ) {
     const radius =
-      80
+      comboStep === 3
+        ? 105
+        : 80
 
     const explosion =
       this.scene.add.circle(
@@ -1519,7 +1673,9 @@ update(
 
       const damageResult =
         this.calculateDamage(
-          2
+          comboStep === 3
+            ? 3
+            : 2
         )
 
       const currentHealth =
@@ -1676,20 +1832,38 @@ private calculateDamage(
 
   private flashEnemy(
     enemy:
-      Phaser.GameObjects.Rectangle
+      Phaser.GameObjects.Rectangle,
+    comboStep =
+      1
   ) {
+    enemy.setData(
+      'hitStopRemaining',
+      comboStep === 3
+        ? 70
+        : 35
+    )
+
     enemy.setFillStyle(
       0xffffff
     )
 
     this.scene.time.delayedCall(
-      75,
+      comboStep === 3
+        ? 115
+        : 75,
       () => {
         if (
           enemy.active
         ) {
           enemy.setFillStyle(
-            0xff4444
+            ENEMY_STATS[
+              (
+                enemy.getData(
+                  'enemyType'
+                ) ??
+                'normal'
+              ) as EnemyType
+            ].color
           )
         }
       }
@@ -1724,40 +1898,84 @@ private calculateDamage(
     }
   }
 
-  private getFireRate() {
-    let baseRate:
-      number
-
-    switch (
-    this.currentWeapon
-    ) {
-      case 'rifle':
-        baseRate =
-          300
-        break
-
-      case 'scattergun':
-        baseRate =
-          800
-        break
-
-      case 'cannon':
-        baseRate =
-          1200
-        break
-
-      case 'photonLance':
-        baseRate =
-          900
-        break
-
-      case 'greatsword':
-        return Infinity
-    }
-
-    return (
-      baseRate /
+  private getCurrentTiming() {
+    const base =
+      WEAPON_COMBO_TIMINGS[
+        this.currentWeapon
+      ]
+    const speed =
       this.getSpeedMultiplier()
+
+    return {
+      attackDuration:
+        base.attackDuration /
+        speed,
+      earliestNextInput:
+        base.earliestNextInput /
+        speed,
+      latestComboInput:
+        base.latestComboInput /
+        speed,
+      finisherRecovery:
+        base.finisherRecovery /
+        speed,
+    }
+  }
+
+  private getComboDamageMultiplier(
+    comboStep:
+      number
+  ) {
+    return (
+      WEAPON_COMBO_TIMINGS[
+        this.currentWeapon
+      ].damageMultipliers[
+        comboStep - 1
+      ] ?? 1
     )
+  }
+
+  private createMuzzleFlash(
+    direction:
+      Phaser.Math.Vector2,
+    comboStep:
+      number,
+    color:
+      number
+  ) {
+    const size =
+      comboStep === 3
+        ? 22
+        : comboStep === 2
+          ? 16
+          : 12
+
+    const flash =
+      this.scene.add.circle(
+        this.player.x +
+          direction.x * 22,
+        this.player.y +
+          direction.y * 22,
+        size,
+        color,
+        0.85
+      )
+
+    this.scene.tweens.add({
+      targets:
+        flash,
+      alpha:
+        0,
+      scale:
+        1.8,
+      duration:
+        comboStep === 3
+          ? 100
+          : 70,
+      onComplete:
+        () => {
+          flash.destroy()
+        },
+    })
   }
 }

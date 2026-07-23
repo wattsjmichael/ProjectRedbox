@@ -50,6 +50,9 @@ export class HunterBayScene
   private readonly itemsPerPage =
     12
 
+  private statusMessage =
+    ''
+
   constructor() {
     super(
       'HunterBayScene'
@@ -119,6 +122,7 @@ export class HunterBayScene
     this.createRecentFinds()
     this.createInventoryGrid()
     this.createItemDetails()
+    this.createStatusMessage()
     this.createNavigation()
   }
 
@@ -792,6 +796,8 @@ export class HunterBayScene
           )
 
         if (equippedItem) {
+          this.statusMessage =
+            `${equippedItem.name.toUpperCase()} EQUIPPED`
           this.save()
           this.render()
         }
@@ -813,9 +819,12 @@ export class HunterBayScene
           return
         }
 
-        this.mag.feedWeapon(
-          item
-        )
+        const result =
+          this.mag.feedWeapon(
+            item
+          )
+        this.statusMessage =
+          `${item.name.toUpperCase()} FED // +${result.experienceGained} XP // +${result.statGained} ${result.statName.toUpperCase()} // MAG LV ${result.newLevel}`
         this.selectedItem =
           this.inventory
             .getEquippedItem() ??
@@ -826,6 +835,35 @@ export class HunterBayScene
         this.render()
       }
     )
+  }
+
+  private createStatusMessage() {
+    if (!this.statusMessage) {
+      return
+    }
+
+    this.add.text(
+      925,
+      580,
+      this.statusMessage,
+      {
+        fontFamily:
+          'Arial Black, Arial',
+        fontSize:
+          '13px',
+        color:
+          '#ffcc66',
+        align:
+          'center',
+        wordWrap: {
+          width:
+            610,
+        },
+      }
+    )
+      .setOrigin(
+        0.5
+      )
   }
 
   private getComparisonLine(

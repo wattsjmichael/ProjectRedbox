@@ -130,6 +130,23 @@ export class PersistenceSystem {
     }
   }
 
+  reset() {
+    try {
+      window.localStorage.removeItem(
+        PersistenceSystem.storageKey
+      )
+
+      return true
+    } catch (error) {
+      console.warn(
+        'Could not reset Project Redbox save.',
+        error
+      )
+
+      return false
+    }
+  }
+
   private clone(
     data: PersistentGameData
   ): PersistentGameData {

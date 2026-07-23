@@ -1,9 +1,16 @@
 import Phaser from 'phaser'
 
+import {
+  PersistenceSystem,
+} from '../persistence/PersistenceSystem'
+
 export class TitleScene
   extends Phaser.Scene {
   private starting =
     false
+
+  private readonly persistence =
+    new PersistenceSystem()
 
   constructor() {
     super(
@@ -12,6 +19,9 @@ export class TitleScene
   }
 
   create() {
+    this.starting =
+      false
+
     this.cameras.main
       .setBackgroundColor(
         '#050505'
@@ -144,6 +154,107 @@ export class TitleScene
           this.beginGame()
         }
       )
+
+    this.createResetHunterButton()
+  }
+
+  private createResetHunterButton() {
+    const resetHunter =
+      this.add
+        .text(
+          640,
+          655,
+          '[ RESET HUNTER ]',
+          {
+            fontFamily:
+              'Arial Black, Arial',
+            fontSize:
+              '14px',
+            color:
+              '#777777',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setInteractive({
+          useHandCursor:
+            true,
+        })
+
+    resetHunter.on(
+      'pointerover',
+      () => {
+        resetHunter.setColor(
+          '#ff5555'
+        )
+      }
+    )
+
+    resetHunter.on(
+      'pointerout',
+      () => {
+        resetHunter.setColor(
+          '#777777'
+        )
+      }
+    )
+
+    resetHunter.on(
+      'pointerdown',
+      () => {
+        if (this.starting) {
+          return
+        }
+
+        const confirmed =
+          window.confirm(
+            'Reset Hunter? This permanently deletes all inventory, MAG progress, equipment, and lifetime stats.'
+          )
+
+        if (!confirmed) {
+          return
+        }
+
+        const reset =
+          this.persistence.reset()
+
+        if (!reset) {
+          this.showResetError()
+          return
+        }
+
+        this.scene.restart()
+      }
+    )
+  }
+
+  private showResetError() {
+    const error =
+      this.add
+        .text(
+          640,
+          615,
+          'RESET FAILED — SAVE DATA WAS NOT CHANGED',
+          {
+            fontFamily:
+              'Arial Black, Arial',
+            fontSize:
+              '13px',
+            color:
+              '#ff5555',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+
+    this.time.delayedCall(
+      2200,
+      () => {
+        error.destroy()
+      }
+    )
   }
 
   private beginGame() {
