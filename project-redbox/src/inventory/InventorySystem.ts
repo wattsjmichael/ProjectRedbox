@@ -9,11 +9,32 @@ export class InventorySystem {
   private equippedItem:
     WeaponItem | null = null
 
+  private readonly maxItems = 30
+
   addItem(
     item: WeaponItem
   ) {
+    if (this.items.length >= this.maxItems) {
+      return false
+    }
     this.items.push(
       item
+    )
+    return true
+  }
+
+  getCapacity() {
+    return this.maxItems
+  }
+
+  getItemCount() {
+    return this.items.length
+  }
+
+  isFull() {
+    return (
+      this.items.length >=
+      this.maxItems
     )
   }
 
@@ -71,14 +92,45 @@ export class InventorySystem {
           item.id
       )
 
-    if (
-      !alreadyOwned
-    ) {
-      this.items.push(
-        item
-      )
-    }
+   if (
+  !alreadyOwned &&
+  !this.isFull()
+) {
+  this.items.push(
+    item
+  )
+}
   }
+
+removeItem(
+  id: string
+) {
+  if (
+    this.equippedItem
+      ?.id === id
+  ) {
+    return false
+  }
+
+  const index =
+    this.items.findIndex(
+      item =>
+        item.id === id
+    )
+
+  if (
+    index === -1
+  ) {
+    return false
+  }
+
+  this.items.splice(
+    index,
+    1
+  )
+
+  return true
+}
 
   getEquippedItem() {
     return this.equippedItem
@@ -99,5 +151,28 @@ export class InventorySystem {
 
     this.equippedItem =
       null
+  }
+
+  restore(
+    items: WeaponItem[],
+    equippedItem: WeaponItem | null
+  ) {
+    this.items =
+      items
+        .slice(0, this.maxItems)
+        .map(
+          item => ({ ...item })
+        )
+
+    this.equippedItem =
+      equippedItem
+        ? (
+          this.items.find(
+            item =>
+              item.id ===
+              equippedItem.id
+          ) ?? null
+        )
+        : null
   }
 }

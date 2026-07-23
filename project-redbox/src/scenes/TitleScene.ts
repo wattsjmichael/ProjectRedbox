@@ -1,91 +1,133 @@
 import Phaser from 'phaser'
 
-export class TitleScene extends Phaser.Scene {
+export class TitleScene
+  extends Phaser.Scene {
   private starting =
     false
 
   constructor() {
-    super('TitleScene')
+    super(
+      'TitleScene'
+    )
   }
 
   create() {
-    this.cameras.main.setBackgroundColor(
-      '#050505'
-    )
+    this.cameras.main
+      .setBackgroundColor(
+        '#050505'
+      )
 
-    // Subtle red background glow.
     this.add.circle(
-      400,
-      300,
-      280,
+      640,
+      360,
+      360,
       0x550000,
       0.12
     )
 
     this.add
       .text(
-        400,
-        225,
+        640,
+        265,
         'PROJECT',
         {
-          fontFamily: 'Arial',
-          fontSize: '20px',
-          color: '#999999',
+          fontFamily:
+            'Arial',
+
+          fontSize:
+            '22px',
+
+          color:
+            '#999999',
         }
       )
-      .setOrigin(0.5)
+      .setOrigin(
+        0.5
+      )
 
     this.add
       .text(
-        400,
-        280,
+        640,
+        335,
         'REDBOX',
         {
-          fontFamily: 'Arial Black, Arial',
-          fontSize: '72px',
-          color: '#e50914',
-          fontStyle: 'bold',
+          fontFamily:
+            'Arial Black, Arial',
+
+          fontSize:
+            '86px',
+
+          color:
+            '#e50914',
+
+          fontStyle:
+            'bold',
         }
       )
-      .setOrigin(0.5)
+      .setOrigin(
+        0.5
+      )
 
     this.add
       .text(
+        640,
         400,
-        335,
         'THE DROP BEGINS',
         {
-          fontFamily: 'Arial',
-          fontSize: '16px',
-          color: '#777777',
+          fontFamily:
+            'Arial',
+
+          fontSize:
+            '18px',
+
+          color:
+            '#777777',
         }
       )
-      .setOrigin(0.5)
+      .setOrigin(
+        0.5
+      )
 
     const beginDrop =
       this.add
         .text(
-          400,
-          430,
+          640,
+          525,
           '[ BEGIN DROP ]',
           {
-            fontFamily: 'Arial Black, Arial',
-            fontSize: '24px',
-            color: '#ffffff',
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '28px',
+
+            color:
+              '#ffffff',
           }
         )
-        .setOrigin(0.5)
+        .setOrigin(
+          0.5
+        )
         .setInteractive({
-          useHandCursor: true,
+          useHandCursor:
+            true,
         })
 
-    // Pulse the start button.
     this.tweens.add({
-      targets: beginDrop,
-      alpha: 0.4,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
+      targets:
+        beginDrop,
+
+      alpha:
+        0.4,
+
+      duration:
+        700,
+
+      yoyo:
+        true,
+
+      repeat:
+        -1,
     })
 
     beginDrop.on(
@@ -95,13 +137,13 @@ export class TitleScene extends Phaser.Scene {
       }
     )
 
-    // ENTER also starts the game.
-    this.input.keyboard?.once(
-      'keydown-ENTER',
-      () => {
-        this.beginGame()
-      }
-    )
+    this.input.keyboard
+      ?.once(
+        'keydown-ENTER',
+        () => {
+          this.beginGame()
+        }
+      )
   }
 
   private beginGame() {
@@ -114,12 +156,13 @@ export class TitleScene extends Phaser.Scene {
     this.starting =
       true
 
-    this.cameras.main.flash(
-      250,
-      180,
-      0,
-      0
-    )
+    this.cameras.main
+      .flash(
+        250,
+        180,
+        0,
+        0
+      )
 
     this.time.delayedCall(
       150,

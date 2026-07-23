@@ -8,6 +8,10 @@ import {
   ENEMY_STATS,
 } from './EnemyTypes'
 
+import type {
+  DropScaling,
+} from '../progression/DropScalingSystem'
+
 interface EnemyManagerConfig {
   scene: Phaser.Scene
 
@@ -18,6 +22,9 @@ interface EnemyManagerConfig {
     (
       amount: number
     ) => void
+
+  scaling:
+    DropScaling
 }
 
 export class EnemyManager {
@@ -54,6 +61,9 @@ export class EnemyManager {
   private onPlayerDamage:
     EnemyManagerConfig['onPlayerDamage']
 
+  private scaling:
+    DropScaling
+
   // WYRM BOSS STATE
 
   private wyrm:
@@ -81,6 +91,9 @@ export class EnemyManager {
 
     this.onPlayerDamage =
       config.onPlayerDamage
+
+    this.scaling =
+      config.scaling
   }
 
   getEnemies() {
@@ -122,6 +135,23 @@ export class EnemyManager {
     )
   }
 
+  getMaxHealth(
+    type:
+      EnemyType
+  ) {
+    const multiplier =
+      type === 'wyrm'
+        ? this.scaling
+          .wyrmHealthMultiplier
+        : this.scaling
+          .enemyHealthMultiplier
+
+    return (
+      ENEMY_STATS[type].health *
+      multiplier
+    )
+  }
+
   getWyrm() {
     return this.wyrm
   }
@@ -160,7 +190,9 @@ export class EnemyManager {
 
     this.enemyHealth.set(
       enemy,
-      stats.health
+      this.getMaxHealth(
+        type
+      )
     )
 
     this.enemyTypes.set(
@@ -564,7 +596,10 @@ export class EnemyManager {
           radius
         ) {
           this.onPlayerDamage(
-            30
+            ENEMY_STATS.wyrm
+              .contactDamage *
+            this.scaling
+              .wyrmDamageMultiplier
           )
         }
 
@@ -628,7 +663,14 @@ export class EnemyManager {
       const damage =
         ENEMY_STATS[
           type
-        ].contactDamage
+        ].contactDamage *
+        (
+          type === 'wyrm'
+            ? this.scaling
+              .wyrmDamageMultiplier
+            : this.scaling
+              .enemyDamageMultiplier
+        )
 
       this.onPlayerDamage(
         damage

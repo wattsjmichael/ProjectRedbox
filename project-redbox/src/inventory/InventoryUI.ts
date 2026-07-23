@@ -9,6 +9,10 @@ import {
   InventorySystem,
 } from './InventorySystem'
 
+import {
+  MagSystem,
+} from '../mag/MagSystem'
+
 interface InventoryUIConfig {
   scene:
     Phaser.Scene
@@ -16,11 +20,35 @@ interface InventoryUIConfig {
   inventory:
     InventorySystem
 
+  mag:
+    MagSystem
+
+  getHunterStats:
+    () => {
+      attackBonus:
+        number
+
+      criticalChanceBonus:
+        number
+
+      defenseReduction:
+        number
+
+      energyBonus:
+        number
+    }
+
   onEquip:
     (
       item:
         WeaponItem
     ) => void
+
+  onFeed:
+    (
+      item:
+        WeaponItem
+    ) => boolean
 
   onClose:
     () => void
@@ -33,8 +61,17 @@ export class InventoryUI {
   private inventory:
     InventorySystem
 
+  private mag:
+    MagSystem
+
+  private getHunterStats:
+    InventoryUIConfig['getHunterStats']
+
   private onEquip:
     InventoryUIConfig['onEquip']
+
+  private onFeed:
+    InventoryUIConfig['onFeed']
 
   private onClose:
     InventoryUIConfig['onClose']
@@ -43,10 +80,17 @@ export class InventoryUI {
     Phaser.GameObjects.Container
 
   private selectedItem:
-    WeaponItem | null = null
+    WeaponItem | null =
+    null
 
   private visible =
     false
+
+  private currentPage =
+    0
+
+  private readonly itemsPerPage =
+    8
 
   constructor(
     config:
@@ -58,8 +102,17 @@ export class InventoryUI {
     this.inventory =
       config.inventory
 
+    this.mag =
+      config.mag
+
+    this.getHunterStats =
+      config.getHunterStats
+
     this.onEquip =
       config.onEquip
+
+    this.onFeed =
+      config.onFeed
 
     this.onClose =
       config.onClose
@@ -79,17 +132,19 @@ export class InventoryUI {
   }
 
   open() {
-  this.visible =
-    true
+    this.visible =
+      true
 
-  this.container.setPosition(
-    this.scene.cameras.main.scrollX,
-    this.scene.cameras.main.scrollY
-  )
+    // Keep the UI aligned with
+    // the current camera position.
+    this.container.setPosition(
+      this.scene.cameras.main.scrollX,
+      this.scene.cameras.main.scrollY
+    )
 
-  this.container.setVisible(
-    true
-  )
+    this.container.setVisible(
+      true
+    )
 
     const items =
       this.inventory.getItems()
@@ -97,10 +152,36 @@ export class InventoryUI {
     const equipped =
       this.inventory.getEquippedItem()
 
-    this.selectedItem =
-      equipped ??
-      items[0] ??
-      null
+    if (
+      equipped
+    ) {
+      const equippedIndex =
+        items.findIndex(
+          item =>
+            item.id ===
+            equipped.id
+        )
+
+      if (
+        equippedIndex >= 0
+      ) {
+        this.currentPage =
+          Math.floor(
+            equippedIndex /
+            this.itemsPerPage
+          )
+      }
+
+      this.selectedItem =
+        equipped
+    } else {
+      this.currentPage =
+        0
+
+      this.selectedItem =
+        items[0] ??
+        null
+    }
 
     this.rebuild()
   }
@@ -140,7 +221,13 @@ export class InventoryUI {
     )
 
     this.createBackground()
+
+    this.createMagPanel()
+
+    this.createHunterStatsPanel()
+
     this.createItemList()
+
     this.createStatsPanel()
   }
 
@@ -148,21 +235,21 @@ export class InventoryUI {
     const blocker =
       this.scene.add
         .rectangle(
-          400,
-          300,
-          800,
-          600,
+          640,
+          360,
+          1280,
+          720,
           0x000000,
-          0.82
+          0.88
         )
 
     const panel =
       this.scene.add
         .rectangle(
-          400,
-          300,
-          720,
-          500,
+          640,
+          360,
+          1160,
+          640,
           0x111111,
           0.98
         )
@@ -174,15 +261,15 @@ export class InventoryUI {
     const title =
       this.scene.add
         .text(
-          70,
-          70,
+          80,
+          55,
           'BACKPACK',
           {
             fontFamily:
               'Arial Black, Arial',
 
             fontSize:
-              '34px',
+              '38px',
 
             color:
               '#e50914',
@@ -192,18 +279,18 @@ export class InventoryUI {
     const divider =
       this.scene.add
         .rectangle(
-          385,
-          310,
+          520,
+          370,
           2,
-          390,
+          540,
           0x444444
         )
 
     const closeBackground =
       this.scene.add
         .rectangle(
-          720,
-          82,
+          1190,
+          70,
           70,
           40,
           0x222222
@@ -220,8 +307,8 @@ export class InventoryUI {
     const closeText =
       this.scene.add
         .text(
-          720,
-          82,
+          1190,
+          70,
           'X',
           {
             fontFamily:
@@ -255,6 +342,212 @@ export class InventoryUI {
     ])
   }
 
+  private createMagPanel() {
+    const mag =
+      this.mag.getMag()
+
+    const xpNeeded =
+      this.mag
+        .getExperienceNeeded()
+
+    const magBackground =
+      this.scene.add
+        .rectangle(
+          290,
+          145,
+          400,
+          70,
+          0x181818,
+          0.95
+        )
+        .setStrokeStyle(
+          1,
+          0x444444
+        )
+
+    const magTitle =
+      this.scene.add
+        .text(
+          105,
+          125,
+          `MAG // ${mag.name}`,
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '15px',
+
+            color:
+              '#e50914',
+          }
+        )
+
+    const magLevel =
+      this.scene.add
+        .text(
+          455,
+          125,
+          `LV ${mag.level}`,
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '14px',
+
+            color:
+              '#ffffff',
+          }
+        )
+        .setOrigin(
+          1,
+          0
+        )
+
+    const magStats =
+      this.scene.add
+        .text(
+          105,
+          153,
+          [
+            `PWR ${mag.stats.power}`,
+            `DEF ${mag.stats.defense}`,
+            `DEX ${mag.stats.dexterity}`,
+            `ENG ${mag.stats.energy}`,
+          ].join(
+            '     '
+          ),
+          {
+            fontFamily:
+              'Arial',
+
+            fontSize:
+              '12px',
+
+            color:
+              '#bbbbbb',
+          }
+        )
+
+    const magExperience =
+      this.scene.add
+        .text(
+          455,
+          153,
+          `XP ${mag.experience} / ${xpNeeded}`,
+          {
+            fontFamily:
+              'Arial',
+
+            fontSize:
+              '12px',
+
+            color:
+              '#777777',
+          }
+        )
+        .setOrigin(
+          1,
+          0
+        )
+
+    this.container.add([
+      magBackground,
+      magTitle,
+      magLevel,
+      magStats,
+      magExperience,
+    ])
+  }
+
+  private createHunterStatsPanel() {
+    const stats =
+      this.getHunterStats()
+
+    const panel =
+      this.scene.add
+        .rectangle(
+          850,
+          145,
+          600,
+          120,
+          0x181818,
+          0.95
+        )
+        .setStrokeStyle(
+          1,
+          0x444444
+        )
+
+    const title =
+      this.scene.add
+        .text(
+          570,
+          105,
+          'HUNTER STATS',
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '16px',
+
+            color:
+              '#e50914',
+          }
+        )
+
+    const statText =
+      this.scene.add
+        .text(
+          570,
+          137,
+          [
+            `ATTACK BONUS       +${(
+              stats.attackBonus *
+              100
+            ).toFixed(0)}%`,
+
+            `CRITICAL BONUS     +${(
+              stats.criticalChanceBonus *
+              100
+            ).toFixed(1)}%`,
+
+            `DAMAGE REDUCTION    ${(
+              stats.defenseReduction *
+              100
+            ).toFixed(0)}%`,
+
+            `RARE POWER         +${(
+              stats.energyBonus *
+              100
+            ).toFixed(0)}%`,
+          ].join(
+            '\n'
+          ),
+          {
+            fontFamily:
+              'Arial',
+
+            fontSize:
+              '13px',
+
+            color:
+              '#cccccc',
+
+            lineSpacing:
+              5,
+          }
+        )
+
+    this.container.add([
+      panel,
+      title,
+      statText,
+    ])
+  }
+
   private createItemList() {
     const items =
       this.inventory.getItems()
@@ -264,21 +557,22 @@ export class InventoryUI {
       0
     ) {
       const emptyText =
-        this.scene.add.text(
-          85,
-          150,
-          'NO ITEMS',
-          {
-            fontFamily:
-              'Arial',
+        this.scene.add
+          .text(
+            100,
+            225,
+            'NO ITEMS',
+            {
+              fontFamily:
+                'Arial',
 
-            fontSize:
-              '18px',
+              fontSize:
+                '18px',
 
-            color:
-              '#777777',
-          }
-        )
+              color:
+                '#777777',
+            }
+          )
 
       this.container.add(
         emptyText
@@ -287,38 +581,57 @@ export class InventoryUI {
       return
     }
 
-    const maxVisible =
-      8
+    const totalPages =
+      Math.max(
+        1,
+        Math.ceil(
+          items.length /
+          this.itemsPerPage
+        )
+      )
+
+    if (
+      this.currentPage >=
+      totalPages
+    ) {
+      this.currentPage =
+        totalPages - 1
+    }
+
+    const startIndex =
+      this.currentPage *
+      this.itemsPerPage
 
     const visibleItems =
       items.slice(
-        0,
-        maxVisible
+        startIndex,
+        startIndex +
+        this.itemsPerPage
       )
 
     let y =
-      140
+      225
 
     for (
       const item of
-        visibleItems
+      visibleItems
     ) {
       const selected =
         this.selectedItem
-          ?.id === item.id
+          ?.id ===
+        item.id
 
       const equipped =
         this.inventory.isEquipped(
           item.id
         )
 
-      // Entire row is clickable.
       const row =
         this.scene.add
           .rectangle(
-            220,
-            y,
             290,
+            y,
+            400,
             42,
             selected
               ? 0x3a1111
@@ -328,7 +641,6 @@ export class InventoryUI {
             selected
               ? 2
               : 1,
-
             selected
               ? 0xe50914
               : 0x444444
@@ -346,7 +658,7 @@ export class InventoryUI {
       const name =
         this.scene.add
           .text(
-            90,
+            100,
             y,
             item.name,
             {
@@ -386,7 +698,7 @@ export class InventoryUI {
         const equippedText =
           this.scene.add
             .text(
-              340,
+              450,
               y,
               'EQUIPPED',
               {
@@ -413,18 +725,28 @@ export class InventoryUI {
         50
     }
 
-    if (
-      items.length >
-      maxVisible
-    ) {
-      const moreText =
-        this.scene.add.text(
-          90,
-          545,
-          `+ ${items.length - maxVisible} MORE ITEMS`,
+    this.createPageControls(
+      items,
+      totalPages
+    )
+  }
+
+  private createPageControls(
+    items:
+      WeaponItem[],
+
+    totalPages:
+      number
+  ) {
+    const inventoryCount =
+      this.scene.add
+        .text(
+          100,
+          650,
+          `${items.length} / ${this.inventory.getCapacity()}`,
           {
             fontFamily:
-              'Arial',
+              'Arial Black, Arial',
 
             fontSize:
               '13px',
@@ -434,8 +756,139 @@ export class InventoryUI {
           }
         )
 
+    const pageText =
+      this.scene.add
+        .text(
+          330,
+          650,
+          `${this.currentPage + 1} / ${totalPages}`,
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '13px',
+
+            color:
+              '#ffffff',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+
+    this.container.add([
+      inventoryCount,
+      pageText,
+    ])
+
+    if (
+      this.currentPage >
+      0
+    ) {
+      const previousButton =
+        this.scene.add
+          .text(
+            240,
+            650,
+            '< PREV',
+            {
+              fontFamily:
+                'Arial Black, Arial',
+
+              fontSize:
+                '13px',
+
+              color:
+                '#e50914',
+            }
+          )
+          .setOrigin(
+            0.5
+          )
+          .setInteractive({
+            useHandCursor:
+              true,
+          })
+
+      previousButton.on(
+        'pointerdown',
+        () => {
+          this.currentPage--
+
+          const newItems =
+            this.inventory.getItems()
+
+          const index =
+            this.currentPage *
+            this.itemsPerPage
+
+          this.selectedItem =
+            newItems[
+              index
+            ] ?? null
+
+          this.rebuild()
+        }
+      )
+
       this.container.add(
-        moreText
+        previousButton
+      )
+    }
+
+    if (
+      this.currentPage <
+      totalPages - 1
+    ) {
+      const nextButton =
+        this.scene.add
+          .text(
+            420,
+            650,
+            'NEXT >',
+            {
+              fontFamily:
+                'Arial Black, Arial',
+
+              fontSize:
+                '13px',
+
+              color:
+                '#e50914',
+            }
+          )
+          .setOrigin(
+            0.5
+          )
+          .setInteractive({
+            useHandCursor:
+              true,
+          })
+
+      nextButton.on(
+        'pointerdown',
+        () => {
+          this.currentPage++
+
+          const newItems =
+            this.inventory.getItems()
+
+          const index =
+            this.currentPage *
+            this.itemsPerPage
+
+          this.selectedItem =
+            newItems[
+              index
+            ] ?? null
+
+          this.rebuild()
+        }
+      )
+
+      this.container.add(
+        nextButton
       )
     }
   }
@@ -450,8 +903,8 @@ export class InventoryUI {
       const text =
         this.scene.add
           .text(
-            430,
-            150,
+            570,
+            265,
             'SELECT AN ITEM',
             {
               fontFamily:
@@ -480,15 +933,15 @@ export class InventoryUI {
     const name =
       this.scene.add
         .text(
-          430,
-          135,
+          570,
+          245,
           item.name.toUpperCase(),
           {
             fontFamily:
               'Arial Black, Arial',
 
             fontSize:
-              '24px',
+              '28px',
 
             color:
               rarityColor,
@@ -498,8 +951,8 @@ export class InventoryUI {
     const rarity =
       this.scene.add
         .text(
-          430,
-          170,
+          570,
+          285,
           item.rarity.toUpperCase(),
           {
             fontFamily:
@@ -516,8 +969,8 @@ export class InventoryUI {
     const type =
       this.scene.add
         .text(
-          430,
-          205,
+          570,
+          315,
           item.weaponType.toUpperCase(),
           {
             fontFamily:
@@ -534,13 +987,19 @@ export class InventoryUI {
     const stats =
       this.scene.add
         .text(
-          430,
-          260,
+          570,
+          365,
           [
             `ATTACK          ${item.attack}`,
             `SPEED           ${item.speed}`,
-            `CRIT CHANCE     ${(item.criticalChance * 100).toFixed(0)}%`,
-            `CRIT DAMAGE     ${(item.criticalDamage * 100).toFixed(0)}%`,
+            `CRIT CHANCE     ${(
+              item.criticalChance *
+              100
+            ).toFixed(0)}%`,
+            `CRIT DAMAGE     ${(
+              item.criticalDamage *
+              100
+            ).toFixed(0)}%`,
           ].join(
             '\n\n'
           ),
@@ -563,6 +1022,7 @@ export class InventoryUI {
       stats,
     ])
 
+    // Equipped weapons cannot be fed.
     if (
       this.inventory.isEquipped(
         item.id
@@ -571,10 +1031,10 @@ export class InventoryUI {
       const equippedBackground =
         this.scene.add
           .rectangle(
-            540,
-            475,
-            240,
-            58,
+            850,
+            610,
+            360,
+            56,
             0x2a0a0a
           )
           .setStrokeStyle(
@@ -585,8 +1045,8 @@ export class InventoryUI {
       const equippedText =
         this.scene.add
           .text(
-            540,
-            475,
+            850,
+            610,
             'EQUIPPED',
             {
               fontFamily:
@@ -611,14 +1071,13 @@ export class InventoryUI {
       return
     }
 
-    // Entire button is clickable.
     const equipButton =
       this.scene.add
         .rectangle(
-          540,
-          475,
-          240,
-          58,
+          850,
+          575,
+          360,
+          52,
           0xe50914
         )
         .setStrokeStyle(
@@ -633,8 +1092,8 @@ export class InventoryUI {
     const equipText =
       this.scene.add
         .text(
-          540,
-          475,
+          850,
+          575,
           'EQUIP WEAPON',
           {
             fontFamily:
@@ -699,9 +1158,120 @@ export class InventoryUI {
       }
     )
 
+    const feedButton =
+      this.scene.add
+        .rectangle(
+          850,
+          640,
+          360,
+          52,
+          0x333333
+        )
+        .setStrokeStyle(
+          2,
+          0xff4444
+        )
+        .setInteractive({
+          useHandCursor:
+            true,
+        })
+
+    const feedText =
+      this.scene.add
+        .text(
+          850,
+          640,
+          'FEED TO MAG',
+          {
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '18px',
+
+            color:
+              '#ff4444',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+
+    feedButton.on(
+      'pointerover',
+      () => {
+        feedButton.setFillStyle(
+          0x551111
+        )
+      }
+    )
+
+    feedButton.on(
+      'pointerout',
+      () => {
+        feedButton.setFillStyle(
+          0x333333
+        )
+      }
+    )
+
+    feedButton.on(
+      'pointerdown',
+      () => {
+        const fed =
+          this.onFeed(
+            item
+          )
+
+        if (
+          !fed
+        ) {
+          return
+        }
+
+        const items =
+          this.inventory.getItems()
+
+        const totalPages =
+          Math.max(
+            1,
+            Math.ceil(
+              items.length /
+              this.itemsPerPage
+            )
+          )
+
+        if (
+          this.currentPage >=
+          totalPages
+        ) {
+          this.currentPage =
+            totalPages - 1
+        }
+
+        const startIndex =
+          this.currentPage *
+          this.itemsPerPage
+
+        this.selectedItem =
+          items[
+            startIndex
+          ] ??
+          items[
+            startIndex - 1
+          ] ??
+          items[0] ??
+          null
+
+        this.rebuild()
+      }
+    )
+
     this.container.add([
       equipButton,
       equipText,
+      feedButton,
+      feedText,
     ])
   }
 

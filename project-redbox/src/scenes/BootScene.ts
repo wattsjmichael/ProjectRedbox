@@ -1,37 +1,52 @@
 import Phaser from 'phaser'
 
-export class BootScene extends Phaser.Scene {
+export class BootScene
+  extends Phaser.Scene {
   constructor() {
-    super('BootScene')
+    super(
+      'BootScene'
+    )
   }
 
   create() {
-    this.cameras.main.setBackgroundColor(
-      '#050505'
-    )
+    this.cameras.main
+      .setBackgroundColor(
+        '#050505'
+      )
 
     const dadbod =
       this.add
         .text(
-          400,
-          270,
+          640,
+          320,
           'DADBOD',
           {
-            fontFamily: 'Arial Black, Arial',
-            fontSize: '64px',
-            color: '#e50914',
-            fontStyle: 'bold',
+            fontFamily:
+              'Arial Black, Arial',
+
+            fontSize:
+              '72px',
+
+            color:
+              '#e50914',
+
+            fontStyle:
+              'bold',
           }
         )
-        .setOrigin(0.5)
-        .setAlpha(0)
+        .setOrigin(
+          0.5
+        )
+        .setAlpha(
+          0
+        )
 
     const line =
       this.add
         .rectangle(
-          400,
-          310,
-          300,
+          640,
+          370,
+          360,
           3,
           0xe50914
         )
@@ -39,79 +54,107 @@ export class BootScene extends Phaser.Scene {
           0,
           1
         )
-        .setAlpha(0)
+        .setAlpha(
+          0
+        )
 
     const studios =
       this.add
         .text(
-          400,
-          340,
+          640,
+          405,
           'S T U D I O S',
           {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            color: '#dddddd',
+            fontFamily:
+              'Arial',
+
+            fontSize:
+              '20px',
+
+            color:
+              '#dddddd',
           }
         )
-        .setOrigin(0.5)
-        .setAlpha(0)
+        .setOrigin(
+          0.5
+        )
+        .setAlpha(
+          0
+        )
 
-    // DADBOD fades in.
     this.tweens.add({
-      targets: dadbod,
-      alpha: 1,
-      duration: 600,
-      ease: 'Power2',
+      targets:
+        dadbod,
+
+      alpha:
+        1,
+
+      duration:
+        600,
+
+      ease:
+        'Power2',
     })
 
-    // Line expands outward
-    // from the center.
     this.time.delayedCall(
       350,
       () => {
-        line.setAlpha(1)
+        line.setAlpha(
+          1
+        )
 
         this.tweens.add({
-          targets: line,
-          scaleX: 1,
-          duration: 500,
-          ease: 'Power2',
+          targets:
+            line,
+
+          scaleX:
+            1,
+
+          duration:
+            500,
+
+          ease:
+            'Power2',
         })
       }
     )
 
-    // STUDIOS fades in.
     this.time.delayedCall(
       700,
       () => {
         this.tweens.add({
-          targets: studios,
-          alpha: 1,
-          duration: 500,
+          targets:
+            studios,
+
+          alpha:
+            1,
+
+          duration:
+            500,
         })
       }
     )
 
-    // Hold the completed logo,
-    // then flash into title screen.
     this.time.delayedCall(
       2000,
       () => {
-        this.cameras.main.flash(
-          350,
-          180,
-          0,
-          0
-        )
+        this.cameras.main
+          .flash(
+            350,
+            180,
+            0,
+            0
+          )
 
-        this.time.delayedCall(
-          200,
-          () => {
-            this.scene.start(
-              'TitleScene'
-            )
-          }
-        )
+        this.time
+          .delayedCall(
+            200,
+            () => {
+              this.scene.start(
+                'TitleScene'
+              )
+            }
+          )
       }
     )
   }

@@ -21,7 +21,6 @@ export class HUD {
   private weaponText!:
     Phaser.GameObjects.Text
 
-
   private xpBarFill!:
     Phaser.GameObjects.Rectangle
 
@@ -90,8 +89,8 @@ export class HUD {
     this.killText =
       this.scene.add
         .text(
-          16,
-          16,
+          20,
+          20,
           'Kills: 0',
           {
             fontSize:
@@ -108,8 +107,8 @@ export class HUD {
     this.healthText =
       this.scene.add
         .text(
-          16,
-          50,
+          20,
+          55,
           `HP: ${stats.health} / ${stats.maxHealth}`,
           {
             fontSize:
@@ -126,10 +125,13 @@ export class HUD {
     this.weaponText =
       this.scene.add
         .text(
-          784,
-          16,
+          1260,
+          20,
           'RIFLE',
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '20px',
 
@@ -147,8 +149,8 @@ export class HUD {
 
     this.scene.add
       .rectangle(
-        400,
-        580,
+        640,
+        695,
         300,
         16,
         0x333333
@@ -160,8 +162,8 @@ export class HUD {
     this.xpBarFill =
       this.scene.add
         .rectangle(
-          250,
-          580,
+          490,
+          695,
           0,
           12,
           0x44aaff
@@ -177,8 +179,8 @@ export class HUD {
     this.xpText =
       this.scene.add
         .text(
-          400,
-          555,
+          640,
+          670,
           `XP: ${stats.currentXP} / ${stats.xpToNextLevel}`,
           {
             fontSize:
@@ -198,10 +200,10 @@ export class HUD {
 
   private createComboUI() {
     const startX =
-      340
+      580
 
     const boxY =
-      485
+      590
 
     const spacing =
       60
@@ -264,10 +266,10 @@ export class HUD {
     }
 
     const timelineX =
-      320
+      560
 
     const timelineY =
-      525
+      635
 
     const timelineWidth =
       160
@@ -372,12 +374,15 @@ export class HUD {
     this.perfectText =
       this.scene.add
         .text(
-          400,
-          445,
+          640,
+          550,
           'PERFECT',
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
-              '22px',
+              '24px',
 
             color:
               '#ffdd55',
@@ -402,10 +407,13 @@ export class HUD {
     this.bossNameText =
       this.scene.add
         .text(
-          400,
-          110,
+          640,
+          65,
           'THE WYRM',
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '24px',
 
@@ -423,8 +431,8 @@ export class HUD {
     this.bossHealthBackground =
       this.scene.add
         .rectangle(
-          400,
-          140,
+          640,
+          100,
           500,
           22,
           0x220000
@@ -440,8 +448,8 @@ export class HUD {
     this.bossHealthFill =
       this.scene.add
         .rectangle(
-          150,
-          140,
+          390,
+          100,
           500,
           18,
           0xaa1111
@@ -457,8 +465,8 @@ export class HUD {
     this.bossHealthText =
       this.scene.add
         .text(
-          400,
-          140,
+          640,
+          100,
           '75 / 75',
           {
             fontSize:
@@ -735,7 +743,7 @@ export class HUD {
       )
 
     this.comboMarker.x =
-      320 +
+      560 +
       160 *
       progress
 
@@ -846,10 +854,13 @@ export class HUD {
     const text =
       this.scene.add
         .text(
-          400,
-          130,
+          640,
+          155,
           message,
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '28px',
 
@@ -872,7 +883,7 @@ export class HUD {
         0,
 
       y:
-        100,
+        125,
 
       duration:
         1200,
@@ -890,8 +901,8 @@ export class HUD {
     const text =
       this.scene.add
         .text(
-          400,
-          150,
+          640,
+          180,
           message,
           {
             fontSize:
@@ -899,6 +910,9 @@ export class HUD {
 
             color:
               '#ffffff',
+
+            align:
+              'center',
           }
         )
         .setOrigin(
@@ -916,7 +930,7 @@ export class HUD {
         0,
 
       y:
-        120,
+        150,
 
       duration:
         900,
@@ -929,15 +943,19 @@ export class HUD {
   }
 
   showRareLootMessage(
-    weaponName: string
+    weaponName: string,
+    details = ''
   ) {
     const rareText =
       this.scene.add
         .text(
-          400,
-          130,
-          'RARE WEAPON',
+          640,
+          145,
+          'RED BOX // RARE WEAPON',
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '20px',
 
@@ -955,15 +973,48 @@ export class HUD {
     const weaponText =
       this.scene.add
         .text(
-          400,
-          165,
+          640,
+          185,
           weaponName,
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '32px',
 
             color:
               '#ffffff',
+
+            align:
+              'center',
+          }
+        )
+        .setOrigin(
+          0.5
+        )
+        .setScrollFactor(
+          0
+        )
+
+    const detailsText =
+      this.scene.add
+        .text(
+          640,
+          230,
+          details,
+          {
+            fontFamily:
+              'Arial',
+
+            fontSize:
+              '16px',
+
+            color:
+              '#ffaaaa',
+
+            align:
+              'center',
           }
         )
         .setOrigin(
@@ -974,34 +1025,41 @@ export class HUD {
         )
 
     this.scene.cameras.main.flash(
-      200,
+      300,
       255,
       0,
       0
+    )
+
+    this.scene.cameras.main.shake(
+      250,
+      0.01
     )
 
     this.scene.tweens.add({
       targets: [
         rareText,
         weaponText,
+        detailsText,
       ],
 
       alpha:
         0,
 
       y:
-        '-=30',
+        '-=25',
 
       delay:
-        800,
+        1400,
 
       duration:
-        600,
+        700,
 
       onComplete:
         () => {
           rareText.destroy()
           weaponText.destroy()
+          detailsText.destroy()
         },
     })
   }
@@ -1013,10 +1071,13 @@ export class HUD {
     const levelText =
       this.scene.add
         .text(
-          400,
-          220,
+          640,
+          280,
           `LEVEL ${level}`,
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '42px',
 
@@ -1037,8 +1098,8 @@ export class HUD {
     const statsText =
       this.scene.add
         .text(
-          400,
-          280,
+          640,
+          345,
           `HP +${gains.hpGain}\nPOWER +${gains.powerGain}\nDEFENSE +${gains.defenseGain}`,
           {
             fontSize:
@@ -1094,14 +1155,17 @@ export class HUD {
 
   showGameOver(
     kills: number,
-    onRestart: () => void
+    onReturnToBay: () => void
   ) {
     this.scene.add
       .text(
-        400,
-        250,
+        640,
+        285,
         'DROP FAILED',
         {
+          fontFamily:
+            'Arial Black, Arial',
+
           fontSize:
             '48px',
 
@@ -1118,8 +1182,8 @@ export class HUD {
 
     this.scene.add
       .text(
-        400,
-        320,
+        640,
+        365,
         `Kills: ${kills}`,
         {
           fontSize:
@@ -1139,10 +1203,13 @@ export class HUD {
     const restartText =
       this.scene.add
         .text(
-          400,
-          380,
-          '[ RUN AGAIN ]',
+          640,
+          440,
+          '[ RETURN TO HUNTER BAY ]',
           {
+            fontFamily:
+              'Arial Black, Arial',
+
             fontSize:
               '28px',
 
@@ -1163,7 +1230,7 @@ export class HUD {
 
     restartText.on(
       'pointerdown',
-      onRestart
+      onReturnToBay
     )
   }
 }

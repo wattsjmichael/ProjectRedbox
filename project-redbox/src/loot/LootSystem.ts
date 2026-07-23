@@ -30,7 +30,10 @@ interface LootSystemConfig {
     ) => void
 
   onRedBoxCollected:
-    () => void
+    (
+      item:
+        WeaponItem
+    ) => void
 }
 
 export class LootSystem {
@@ -83,7 +86,6 @@ export class LootSystem {
     const roll =
       Math.random()
 
-    // 5% RED BOX
     if (
       roll <
       0.05
@@ -96,24 +98,12 @@ export class LootSystem {
       return
     }
 
-    // Additional 20%
-    // normal randomized weapon
     if (
       roll <
       0.25
     ) {
-      const weaponTypes:
-        WeaponType[] = [
-          'rifle',
-          'scattergun',
-          'cannon',
-          'greatsword',
-        ]
-
       const weaponType =
-        Phaser.Utils.Array.GetRandom(
-          weaponTypes
-        )
+        this.getRandomWeaponType()
 
       const item =
         ItemGenerator.generateWeapon(
@@ -143,31 +133,24 @@ export class LootSystem {
       item.weaponType
     ) {
       case 'rifle':
-        color =
-          0xffff00
+        color = 0xffff00
         break
 
       case 'scattergun':
-        color =
-          0xffaa00
+        color = 0xffaa00
         break
 
       case 'cannon':
-        color =
-          0xff4444
+        color = 0xff4444
         break
 
       case 'greatsword':
-        color =
-          0xdddddd
-
-        size =
-          26
+        color = 0xdddddd
+        size = 26
         break
 
       case 'photonLance':
-        color =
-          0x00ffff
+        color = 0x00ffff
         break
     }
 
@@ -182,18 +165,22 @@ export class LootSystem {
 
     this.lootDrops.push({
       object,
-
-      type:
-        'weapon',
-
+      type: 'weapon',
       item,
     })
   }
 
   spawnRedBox(
     x: number,
-    y: number
+    y: number,
+    item?: WeaponItem
   ) {
+    const rareItem =
+      item ??
+      ItemGenerator.generateRareWeapon(
+        this.getRandomWeaponType()
+      )
+
     const object =
       this.scene.add.rectangle(
         x,
@@ -205,9 +192,8 @@ export class LootSystem {
 
     this.lootDrops.push({
       object,
-
-      type:
-        'redbox',
+      type: 'redbox',
+      item: rareItem,
     })
 
     this.createRedBoxEffect(
@@ -215,8 +201,6 @@ export class LootSystem {
     )
   }
 
-  // Compatibility with your existing
-  // Wyrm guaranteed drop call:
   spawn(
     x: number,
     y: number,
@@ -233,20 +217,30 @@ export class LootSystem {
     }
   }
 
+  private getRandomWeaponType():
+    WeaponType {
+    const weaponTypes:
+      WeaponType[] = [
+        'rifle',
+        'scattergun',
+        'cannon',
+        'greatsword',
+      ]
+
+    return Phaser.Utils.Array.GetRandom(
+      weaponTypes
+    )
+  }
+
   private checkCollection() {
     for (
       let i =
-        this.lootDrops.length -
-        1;
-
+        this.lootDrops.length - 1;
       i >= 0;
-
       i--
     ) {
       const loot =
-        this.lootDrops[
-          i
-        ]
+        this.lootDrops[i]
 
       if (
         !loot.object.active
@@ -283,8 +277,7 @@ export class LootSystem {
   }
 
   private collectLoot(
-    loot:
-      LootDrop
+    loot: LootDrop
   ) {
     this.destroyLoot(
       loot
@@ -304,15 +297,17 @@ export class LootSystem {
 
     if (
       loot.type ===
-      'redbox'
+        'redbox' &&
+      loot.item
     ) {
-      this.onRedBoxCollected()
+      this.onRedBoxCollected(
+        loot.item
+      )
     }
   }
 
   private destroyLoot(
-    loot:
-      LootDrop
+    loot: LootDrop
   ) {
     const beam =
       loot.object.getData(
@@ -339,30 +334,18 @@ export class LootSystem {
       Phaser.GameObjects.Rectangle
   ) {
     this.scene.tweens.add({
-      targets:
-        redBox,
-
-      scale:
-        1.4,
-
-      alpha:
-        0.7,
-
-      duration:
-        400,
-
-      yoyo:
-        true,
-
-      repeat:
-        -1,
+      targets: redBox,
+      scale: 1.4,
+      alpha: 0.7,
+      duration: 400,
+      yoyo: true,
+      repeat: -1,
     })
 
     const beam =
       this.scene.add.rectangle(
         redBox.x,
-        redBox.y -
-          60,
+        redBox.y - 60,
         6,
         120,
         0xff0000,
@@ -370,20 +353,11 @@ export class LootSystem {
       )
 
     this.scene.tweens.add({
-      targets:
-        beam,
-
-      alpha:
-        0.1,
-
-      duration:
-        500,
-
-      yoyo:
-        true,
-
-      repeat:
-        -1,
+      targets: beam,
+      alpha: 0.1,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
     })
 
     redBox.setData(

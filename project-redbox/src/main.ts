@@ -13,30 +13,40 @@ import {
 } from './scenes/GameScene'
 
 import {
-  ResultsScene,
-} from './scenes/ResultsScene'
+  HunterBayScene,
+} from './scenes/HunterBayScene'
 
 const config:
   Phaser.Types.Core.GameConfig = {
-    type:
-      Phaser.AUTO,
+  type:
+    Phaser.AUTO,
 
-    width:
-      800,
+  width:
+    1280,
 
-    height:
-      600,
+  height:
+    720,
 
-    backgroundColor:
-      '#050505',
+  backgroundColor:
+    '#111827',
 
-    scene: [
-      BootScene,
-      TitleScene,
-      GameScene,
-      ResultsScene,
-    ],
-  }
+  scale: {
+    mode:
+      Phaser.Scale.FIT,
+
+    autoCenter:
+      Phaser.Scale.CENTER_BOTH,
+  },
+
+  scene: [
+    BootScene,
+    TitleScene,
+    GameScene,
+    HunterBayScene,
+  ],
+}
+
+
 
 new Phaser.Game(
   config

@@ -7,6 +7,12 @@ export type ItemRarity =
   | 'uncommon'
   | 'rare'
 
+export type WeaponAffix =
+  | 'heavy'
+  | 'rapid'
+  | 'deadeye'
+  | 'brutal'
+
 export interface BaseItem {
   id: string
   name: string
@@ -31,4 +37,7 @@ export interface WeaponItem
 
   criticalDamage:
     number
+
+  affix?:
+    WeaponAffix
 }

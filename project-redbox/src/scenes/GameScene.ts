@@ -13,10 +13,6 @@ import type {
 } from '../items/ItemTypes'
 
 import {
-  ENEMY_STATS,
-} from '../enemies/EnemyTypes'
-
-import {
   createDefaultPlayerStats,
 } from '../player/PlayerStats'
 
@@ -27,6 +23,14 @@ import {
 import {
   ProgressionSystem,
 } from '../progression/ProgressionSystem'
+
+import {
+  DropScalingSystem,
+} from '../progression/DropScalingSystem'
+
+import type {
+  DropScaling,
+} from '../progression/DropScalingSystem'
 
 import {
   WeaponSystem,
@@ -55,6 +59,25 @@ import {
 import {
   InventoryUI,
 } from '../inventory/InventoryUI'
+
+import {
+  MagSystem,
+} from '../mag/MagSystem'
+
+import {
+  createDefaultAccount,
+  PersistenceSystem,
+} from '../persistence/PersistenceSystem'
+
+import type {
+  AccountProgression,
+  PersistentGameData,
+} from '../persistence/PersistenceSystem'
+
+import type {
+  RunOutcome,
+  RunSummary,
+} from '../runs/RunTypes'
 
 export class GameScene
   extends Phaser.Scene {
@@ -115,16 +138,59 @@ export class GameScene
   private inventoryUI!:
     InventoryUI
 
+  private magSystem!:
+    MagSystem
+
   private inventoryOpen =
     false
+
+  private readonly persistence =
+    new PersistenceSystem()
+
+  private loadedSave:
+    PersistentGameData | null = null
+
+  private account:
+    AccountProgression =
+    createDefaultAccount()
+
+  private recentFinds:
+    WeaponItem[] = []
+
+  private bossesDefeated =
+    0
+
+  private runFinalized =
+    false
+
+  private runScaling!:
+    DropScaling
 
   constructor() {
     super(
       'GameScene'
     )
   }
-
   create() {
+    this.loadedSave =
+      this.persistence.load()
+
+    this.account =
+      this.loadedSave?.account ??
+      createDefaultAccount()
+
+    this.runScaling =
+      DropScalingSystem.calculate(
+        this.loadedSave?.mag ??
+        null,
+        this.loadedSave
+          ?.equippedWeapon ??
+        null,
+        this.account
+      )
+
+    this.logRunScaling()
+
     this.resetRunState()
 
     this.createWorld()
@@ -141,6 +207,8 @@ export class GameScene
 
     this.createInventorySystem()
 
+    this.createMagSystem()
+
     this.createInventoryUI()
 
     this.createLootSystem()
@@ -153,66 +221,96 @@ export class GameScene
 
     this.runStartTime =
       this.time.now
+
+    this.savePersistentState()
+  }
+  private createMagSystem() {
+    this.magSystem =
+      new MagSystem(
+        this.loadedSave?.mag
+      )
   }
 
   private createInventorySystem() {
     this.inventorySystem =
       new InventorySystem()
-      const testItems: WeaponItem[] = [
-  {
-    id: 'test-greatsword-1',
-    category: 'weapon',
-    weaponType: 'greatsword',
-    rarity: 'rare',
-    name: 'Prototype Greatsword',
-    attack: 28,
-    speed: 0.85,
-    criticalChance: 0.18,
-    criticalDamage: 2.0,
-  },
-  {
-    id: 'test-scattergun-1',
-    category: 'weapon',
-    weaponType: 'scattergun',
-    rarity: 'uncommon',
-    name: 'Enhanced Scattergun',
-    attack: 16,
-    speed: 1.15,
-    criticalChance: 0.12,
-    criticalDamage: 1.6,
-  },
-  {
-    id: 'test-cannon-1',
-    category: 'weapon',
-    weaponType: 'cannon',
-    rarity: 'rare',
-    name: 'Prototype Cannon',
-    attack: 25,
-    speed: 0.75,
-    criticalChance: 0.08,
-    criticalDamage: 2.25,
-  },
-  {
-    id: 'test-rifle-1',
-    category: 'weapon',
-    weaponType: 'rifle',
-    rarity: 'uncommon',
-    name: 'Enhanced Rifle',
-    attack: 15,
-    speed: 1.4,
-    criticalChance: 0.2,
-    criticalDamage: 1.75,
-  },
-]
 
-for (
-  const item of
-    testItems
-) {
-  this.inventorySystem.addItem(
-    item
-  )
-}
+    if (
+      this.loadedSave
+    ) {
+      this.inventorySystem.restore(
+        this.loadedSave.inventory,
+        this.loadedSave.equippedWeapon
+      )
+
+      const equipped =
+        this.inventorySystem
+          .getEquippedItem()
+
+      if (equipped) {
+        this.equipWeaponItem(
+          equipped
+        )
+      }
+
+      return
+    }
+
+    const testItems: WeaponItem[] = [
+      {
+        id: 'test-greatsword-1',
+        category: 'weapon',
+        weaponType: 'greatsword',
+        rarity: 'rare',
+        name: 'Prototype Greatsword',
+        attack: 28,
+        speed: 0.85,
+        criticalChance: 0.18,
+        criticalDamage: 2.0,
+      },
+      {
+        id: 'test-scattergun-1',
+        category: 'weapon',
+        weaponType: 'scattergun',
+        rarity: 'uncommon',
+        name: 'Enhanced Scattergun',
+        attack: 16,
+        speed: 1.15,
+        criticalChance: 0.12,
+        criticalDamage: 1.6,
+      },
+      {
+        id: 'test-cannon-1',
+        category: 'weapon',
+        weaponType: 'cannon',
+        rarity: 'rare',
+        name: 'Prototype Cannon',
+        attack: 25,
+        speed: 0.75,
+        criticalChance: 0.08,
+        criticalDamage: 2.25,
+      },
+      {
+        id: 'test-rifle-1',
+        category: 'weapon',
+        weaponType: 'rifle',
+        rarity: 'uncommon',
+        name: 'Enhanced Rifle',
+        attack: 15,
+        speed: 1.4,
+        criticalChance: 0.2,
+        criticalDamage: 1.75,
+      },
+    ]
+
+    for (
+      const item of
+      testItems
+    ) {
+      this.inventorySystem.addItem(
+        item
+      )
+    }
 
     const starterRifle:
       WeaponItem = {
@@ -266,11 +364,46 @@ for (
         inventory:
           this.inventorySystem,
 
+        mag:
+          this.magSystem,
+
+        getHunterStats:
+          () => {
+            return {
+              attackBonus:
+                this.magSystem
+                  .getAttackMultiplier() -
+                1,
+
+              criticalChanceBonus:
+                this.magSystem
+                  .getCriticalChanceBonus(),
+
+              defenseReduction:
+                this.magSystem
+                  .getDefenseReduction(),
+
+              energyBonus:
+                this.magSystem
+                  .getEnergyMultiplier() -
+                1,
+            }
+          },
+
         onEquip:
           (
             item
           ) => {
             this.equipWeaponItem(
+              item
+            )
+          },
+
+        onFeed:
+          (
+            item
+          ) => {
+            return this.feedItemToMag(
               item
             )
           },
@@ -282,9 +415,88 @@ for (
       })
   }
 
+  private feedItemToMag(
+    item:
+      WeaponItem
+  ) {
+    if (
+      this.inventorySystem.isEquipped(
+        item.id
+      )
+    ) {
+      this.hud.showLootMessage(
+        'CANNOT FEED EQUIPPED WEAPON'
+      )
+
+      return false
+    }
+
+    const removed =
+      this.inventorySystem.removeItem(
+        item.id
+      )
+
+    if (
+      !removed
+    ) {
+      return false
+    }
+
+    const result =
+      this.magSystem.feedWeapon(
+        item
+      )
+
+    this.savePersistentState()
+
+    const statName =
+      result.statName
+        .toUpperCase()
+
+    let message =
+      `RB-01 FED\n` +
+      `+${result.statGained} ${statName}\n` +
+      `+${result.experienceGained} XP`
+
+    if (
+      result.leveledUp
+    ) {
+      message +=
+        `\nMAG LEVEL ${result.newLevel}`
+    }
+
+    this.hud.showLootMessage(
+      message
+    )
+
+    return true
+  }
+
   private resetRunState() {
-    this.playerStats =
+    const defaults =
       createDefaultPlayerStats()
+
+    const savedPlayer =
+      this.loadedSave?.player
+
+    this.playerStats = {
+      ...defaults,
+      maxHealth:
+        savedPlayer?.maxHealth ??
+        defaults.maxHealth,
+      health:
+        savedPlayer?.maxHealth ??
+        defaults.maxHealth,
+      power:
+        savedPlayer?.power ??
+        defaults.power,
+      defense:
+        savedPlayer?.defense ??
+        defaults.defense,
+      speed:
+        savedPlayer?.speed ??
+        defaults.speed,
+    }
 
     this.progression =
       new ProgressionSystem(
@@ -304,6 +516,15 @@ for (
       false
 
     this.awaitingBossReward =
+      false
+
+    this.recentFinds =
+      []
+
+    this.bossesDefeated =
+      0
+
+    this.runFinalized =
       false
   }
 
@@ -405,6 +626,8 @@ for (
               amount
             )
           },
+        scaling:
+          this.runScaling,
       })
   }
 
@@ -477,9 +700,38 @@ for (
             ) {
               this.hud.updateBossHealth(
                 health,
-                ENEMY_STATS.wyrm.health
+                this.enemyManager
+                  .getMaxHealth(
+                    'wyrm'
+                  )
               )
             }
+          },
+        getMagAttackMultiplier:
+          () => {
+            return (
+              this.magSystem
+                ?.getAttackMultiplier() ??
+              1
+            )
+          },
+
+        getMagCriticalChanceBonus:
+          () => {
+            return (
+              this.magSystem
+                ?.getCriticalChanceBonus() ??
+              0
+            )
+          },
+
+        getMagEnergyMultiplier:
+          () => {
+            return (
+              this.magSystem
+                ?.getEnergyMultiplier() ??
+              1
+            )
           },
 
         killEnemy:
@@ -539,7 +791,11 @@ for (
               critical
             )
           },
+
+
       })
+
+
   }
 
 
@@ -630,8 +886,12 @@ for (
           },
 
         onRedBoxCollected:
-          () => {
-            this.handleRedBoxCollected()
+          (
+            item
+          ) => {
+            this.handleRedBoxCollected(
+              item
+            )
           },
       })
   }
@@ -765,8 +1025,14 @@ for (
         )
 
         this.hud.showBoss(
-          ENEMY_STATS.wyrm.health,
-          ENEMY_STATS.wyrm.health
+          this.enemyManager
+            .getMaxHealth(
+              'wyrm'
+            ),
+          this.enemyManager
+            .getMaxHealth(
+              'wyrm'
+            )
         )
 
         this.hud.showEncounterMessage(
@@ -1044,8 +1310,14 @@ for (
         )
 
         this.hud.showBoss(
-          ENEMY_STATS.wyrm.health,
-          ENEMY_STATS.wyrm.health
+          this.enemyManager
+            .getMaxHealth(
+              'wyrm'
+            ),
+          this.enemyManager
+            .getMaxHealth(
+              'wyrm'
+            )
         )
 
         this.hud.showEncounterMessage(
@@ -1068,8 +1340,25 @@ for (
       return
     }
 
+    const defenseReduction =
+      this.magSystem
+        ?.getDefenseReduction() ??
+      0
+
+    const finalDamage =
+      Math.max(
+        1,
+        Math.round(
+          amount *
+          (
+            1 -
+            defenseReduction
+          )
+        )
+      )
+
     this.playerStats.health -=
-      amount
+      finalDamage
 
     this.playerStats.health =
       Math.max(
@@ -1120,7 +1409,9 @@ for (
     this.hud.showGameOver(
       this.killCount,
       () => {
-        this.scene.restart()
+        this.finishRun(
+          'defeated'
+        )
       }
     )
   }
@@ -1191,6 +1482,8 @@ for (
     } else {
       this.hud.hideCombo()
     }
+
+    this.savePersistentState()
   }
 
   private killEnemy(
@@ -1222,6 +1515,8 @@ for (
       enemyType ===
       'wyrm'
     ) {
+      this.bossesDefeated++
+
       this.handleWyrmDeath(
         x,
         y
@@ -1268,6 +1563,8 @@ for (
     this.hud.updateXP(
       this.playerStats
     )
+
+    this.savePersistentState()
 
     this.killCount++
 
@@ -1321,36 +1618,78 @@ for (
     )
   }
 
-private handleWeaponCollected(
-  item:
-    WeaponItem
-) {
-  this.inventorySystem.addItem(
-    item
-  )
+  private handleWeaponCollected(
+    item:
+      WeaponItem
+  ) {
+    const added =
+      this.inventorySystem.addItem(
+        item
+      )
 
-  this.hud.showLootMessage(
-    `${item.name.toUpperCase()}\n` +
-    `ADDED TO BACKPACK\n` +
-    `PRESS I TO VIEW`
-  )
+    if (
+      !added
+    ) {
+      this.hud.showLootMessage(
+        'BACKPACK FULL'
+      )
 
-  console.log(
-    'Weapon added to inventory:',
-    item
-  )
-}
+      return
+    }
 
-  private handleRedBoxCollected() {
+    this.hud.showLootMessage(
+      `${item.name.toUpperCase()}\n` +
+      `ADDED TO BACKPACK\n` +
+      `PRESS I TO VIEW`
+    )
+
+    console.log(
+      'Weapon added to inventory:',
+      item
+    )
+
+    this.recentFinds.push(
+      item
+    )
+
+    this.savePersistentState()
+  }
+
+  private handleRedBoxCollected(
+    item:
+      WeaponItem
+  ) {
     this.rareCount++
 
-    this.setWeapon(
-      'photonLance'
-    )
+    const added =
+      this.inventorySystem.addItem(
+        item
+      )
 
-    this.hud.showRareLootMessage(
-      'PHOTON LANCE'
-    )
+    if (
+      added
+    ) {
+      this.recentFinds.push(
+        item
+      )
+
+      this.savePersistentState()
+
+      this.hud.showRareLootMessage(
+        item.name.toUpperCase(),
+        [
+          `ATK ${item.attack}`,
+          `SPD ${item.speed}`,
+          `CRIT ${(item.criticalChance * 100).toFixed(0)}%`,
+          `CRIT DMG ${(item.criticalDamage * 100).toFixed(0)}%`,
+        ].join('   ')
+      )
+    } else {
+      this.hud.showRareLootMessage(
+        'BACKPACK FULL',
+        `${item.name.toUpperCase()} COULD NOT BE STORED`
+      )
+    }
 
     if (
       this.awaitingBossReward
@@ -1365,6 +1704,49 @@ private handleWeaponCollected(
         }
       )
     }
+  }
+
+  private savePersistentState() {
+    if (
+      !this.inventorySystem ||
+      !this.magSystem
+    ) {
+      return
+    }
+
+    this.persistence.save({
+      inventory:
+        this.inventorySystem
+          .getItems(),
+      equippedWeapon:
+        this.inventorySystem
+          .getEquippedItem(),
+      mag:
+        this.magSystem.getMag(),
+      player: {
+        ...(
+          this.loadedSave?.player ??
+          {
+            level:
+              1,
+            currentXP:
+              0,
+            xpToNextLevel:
+              10,
+            maxHealth:
+              100,
+            power:
+              10,
+            defense:
+              5,
+            speed:
+              250,
+          }
+        ),
+      },
+      account:
+        this.account,
+    })
   }
 
   private showCriticalHit(
@@ -1425,24 +1807,79 @@ private handleWeaponCollected(
   }
 
   private completeRun() {
-    const timeMs =
-      this.time.now -
-      this.runStartTime
+    this.finishRun(
+      'completed'
+    )
+  }
+
+  private logRunScaling() {
+    console.info(
+      '[Drop Scaling]',
+      {
+        drop:
+          this.runScaling.dropNumber,
+        progressionScore:
+          this.runScaling
+            .progressionScore,
+        enemyHealth:
+          this.runScaling
+            .enemyHealthMultiplier,
+        enemyDamage:
+          this.runScaling
+            .enemyDamageMultiplier,
+        wyrmHealth:
+          this.runScaling
+            .wyrmHealthMultiplier,
+        wyrmDamage:
+          this.runScaling
+            .wyrmDamageMultiplier,
+      }
+    )
+  }
+
+  private finishRun(
+    outcome:
+      RunOutcome
+  ) {
+    if (this.runFinalized) {
+      return
+    }
+
+    this.runFinalized =
+      true
+
+    const summary:
+      RunSummary = {
+      outcome,
+      kills:
+        this.killCount,
+      bossesDefeated:
+        this.bossesDefeated,
+      rareDrops:
+        this.rareCount,
+      timeMs:
+        this.time.now -
+        this.runStartTime,
+      recentFinds:
+        this.recentFinds.map(
+          item => ({
+            ...item,
+          })
+        ),
+    }
+
+    this.account.lifetimeStats.runs++
+    this.account.lifetimeStats.kills +=
+      summary.kills
+    this.account.lifetimeStats
+      .bossesDefeated +=
+      summary.bossesDefeated
+
+    this.savePersistentState()
 
     this.scene.start(
-      'ResultsScene',
-      {
-        kills:
-          this.killCount,
-
-        level:
-          this.playerStats.level,
-
-        rares:
-          this.rareCount,
-
-        timeMs,
-      }
+      'HunterBayScene',
+      summary
     )
   }
 

@@ -52,12 +52,21 @@ interface WeaponSystemConfig {
     y: number
   ) => void
 
-  onDamageDealt?: (
-    x: number,
-    y: number,
-    damage: number,
-    critical: boolean
-  ) => void
+onDamageDealt?: (
+  x: number,
+  y: number,
+  damage: number,
+  critical: boolean
+) => void
+
+getMagAttackMultiplier:
+  () => number
+
+getMagCriticalChanceBonus:
+  () => number
+
+getMagEnergyMultiplier:
+  () => number
 }
 
 export class WeaponSystem {
@@ -93,6 +102,15 @@ export class WeaponSystem {
 
   private onDamageDealt?:
     WeaponSystemConfig['onDamageDealt']
+
+  private getMagAttackMultiplier:
+  WeaponSystemConfig['getMagAttackMultiplier']
+
+private getMagCriticalChanceBonus:
+  WeaponSystemConfig['getMagCriticalChanceBonus']
+
+private getMagEnergyMultiplier:
+  WeaponSystemConfig['getMagEnergyMultiplier']
 
   private enabled =
     true
@@ -177,6 +195,15 @@ export class WeaponSystem {
 
     this.onDamageDealt =
       config.onDamageDealt
+
+      this.getMagAttackMultiplier =
+  config.getMagAttackMultiplier
+
+this.getMagCriticalChanceBonus =
+  config.getMagCriticalChanceBonus
+
+this.getMagEnergyMultiplier =
+  config.getMagEnergyMultiplier
 
     this.setupMeleeInput()
   }
@@ -1536,49 +1563,74 @@ update(
     }
   }
 
-  private calculateDamage(
-    baseDamage: number
+private calculateDamage(
+  baseDamage: number
+) {
+  // Weapon's rolled Attack stat.
+  const weaponAttackMultiplier =
+    this.getAttackMultiplier()
+
+  // MAG Power bonus.
+  const magAttackMultiplier =
+    this.getMagAttackMultiplier()
+
+  let damage =
+    baseDamage *
+    weaponAttackMultiplier *
+    magAttackMultiplier
+
+  // MAG Energy gives an additional
+  // damage bonus to Rare weapons.
+  if (
+    this.equippedWeapon
+      ?.rarity ===
+    'rare'
   ) {
-    const attackMultiplier =
-      this.getAttackMultiplier()
-
-    let damage =
-      baseDamage *
-      attackMultiplier
-
-    const criticalChance =
-      this.equippedWeapon
-        ?.criticalChance ??
-      0
-
-    const criticalDamage =
-      this.equippedWeapon
-        ?.criticalDamage ??
-      1.5
-
-    const critical =
-      Math.random() <
-      criticalChance
-
-    if (
-      critical
-    ) {
-      damage *=
-        criticalDamage
-    }
-
-    return {
-      damage:
-        Math.max(
-          1,
-          Math.round(
-            damage
-          )
-        ),
-
-      critical,
-    }
+    damage *=
+      this.getMagEnergyMultiplier()
   }
+
+  // Weapon's rolled crit chance
+  // plus MAG Dexterity bonus.
+  const criticalChance =
+    Math.min(
+      0.95,
+      (
+        this.equippedWeapon
+          ?.criticalChance ??
+        0
+      ) +
+      this.getMagCriticalChanceBonus()
+    )
+
+  const criticalDamage =
+    this.equippedWeapon
+      ?.criticalDamage ??
+    1.5
+
+  const critical =
+    Math.random() <
+    criticalChance
+
+  if (
+    critical
+  ) {
+    damage *=
+      criticalDamage
+  }
+
+  return {
+    damage:
+      Math.max(
+        1,
+        Math.round(
+          damage
+        )
+      ),
+
+    critical,
+  }
+}
 
   private getAttackMultiplier() {
     if (
