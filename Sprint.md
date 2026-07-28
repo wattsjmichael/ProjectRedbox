@@ -348,3 +348,145 @@ REPEAT
 * [ ] Monetization
 
 Those come after the persistent progression loop proves itself.
+
+
+# Project Redbox
+# Sprint 2 Roadmap
+## v0.11.0 → v0.12.0
+### **THE HUNT CONTINUES**
+
+**Sprint Theme:** Polish the core experience. Teach the player, improve readability, deepen combat, and make every run more satisfying without expanding scope into large new systems.
+
+---
+
+# Day 29 — Wed 8/12
+## WELCOME HUNTER
+
+* [ ] First-run tutorial overlays
+* [ ] Hunter Hub onboarding
+* [ ] Equip workflow tutorial
+* [ ] MAG feeding tutorial
+* [ ] Tutorial persistence
+* [ ] Skip tutorial option
+* [ ] Commit — `v0.11.0 - Welcome Hunter`
+
+---
+
+# Day 30 — Thu 8/13
+## FIRST ART PASS
+
+* [ ] Select a cohesive free sprite pack
+* [ ] Replace Hunter placeholder sprite
+* [ ] Replace enemy placeholder sprites
+* [ ] Add elite visual variants
+* [ ] Replace Wyrm placeholder sprite
+* [ ] Improve projectile sprites
+* [ ] Improve Red Box sprite
+* [ ] Improve loot pickup sprites
+* [ ] Ensure consistent sprite scaling
+* [ ] Commit — `v0.11.1 - First Art Pass`
+
+---
+
+# Day 31 — Fri 8/14
+## COMBAT POLISH
+
+* [ ] Tune weapon combo timing
+* [ ] Improve hit-stop
+* [ ] Improve impact feedback
+* [ ] Improve enemy hit reactions
+* [ ] Improve combo UI
+* [ ] Improve weapon feel
+* [ ] Commit — `v0.11.2 - Combat Polish`
+
+---
+
+# Day 32 — Sat 8/15
+## WEAPON IDENTITY
+
+* [ ] Rifle finisher identity
+* [ ] Scattergun finisher identity
+* [ ] Cannon finisher identity
+* [ ] Photon Lance finisher identity
+* [ ] Greatsword polish
+* [ ] Balance combo finishers
+* [ ] Commit — `v0.11.3 - Weapon Identity`
+
+---
+
+# Day 33 — Sun 8/16
+## ENEMY PERSONALITY
+
+* [ ] Improve Fast enemy behavior
+* [ ] Improve Tank enemy behavior
+* [ ] Improve Elite encounters
+* [ ] Tune encounter pacing
+* [ ] Improve spawn composition
+* [ ] Commit — `v0.11.4 - Enemy Identity`
+
+---
+
+# Day 34 — Mon 8/17
+## MAG EVOLUTION
+
+* [ ] First MAG evolution stage
+* [ ] Better MAG progression display
+* [ ] Evolution milestones
+* [ ] Evolution bonuses
+* [ ] Improve MAG feeding feedback
+* [ ] Commit — `v0.11.5 - Evolution`
+
+---
+
+## Day 35 — Mon 8/17
+### THE WASTES
+
+* [ ] Design first biome layout
+* [ ] Create distinct combat zones
+* [ ] Add environmental obstacles and cover
+* [ ] Add visual landmarks
+* [ ] Improve enemy spawn regions
+* [ ] Build Wyrm arena approach
+* [ ] Tune exploration flow
+* [ ] Commit — `v0.11.5 - The Wastes`
+
+---
+
+---
+
+# Day 36 — Wed 8/19
+## LOOT CHASE
+
+* [ ] Expand affix pool
+* [ ] Improve affix balance
+* [ ] Improve loot tables
+* [ ] Improve rarity presentation
+* [ ] Tune Red Box excitement
+* [ ] Commit — `v0.11.7 - Loot Chase`
+
+---
+
+# Day 37 — Thu 8/20
+## BALANCE PASS
+
+* [ ] Multi-run playtest
+* [ ] Enemy scaling tuning
+* [ ] Wyrm tuning
+* [ ] Weapon balance
+* [ ] MAG balance
+* [ ] Fix meaningful gameplay bugs
+* [ ] Commit — `v0.11.8 - Balance Pass`
+
+---
+
+# Day 38 — Fri 8/21
+## THE HUNT CONTINUES
+
+* [ ] Fresh-save playtest
+* [ ] Complete five consecutive drops
+* [ ] Verify progression loop
+* [ ] Production build
+* [ ] Upload new itch.io build
+* [ ] Test live build
+* [ ] Send build to Jeff
+* [ ] Commit — `v0.12.0 - THE HUNT CONTINUES`

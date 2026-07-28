@@ -1,5 +1,7 @@
 import type { WeaponItem } from '../items/ItemTypes'
 import type { MagData } from '../mag/MagTypes'
+import { createStarterMag } from '../mag/MagTypes'
+import { createDefaultPlayerStats } from '../player/PlayerStats'
 
 export interface PersistentPlayerProgression {
   level: number
@@ -29,16 +31,37 @@ export interface PersistentGameData {
   mag: MagData
   player: PersistentPlayerProgression
   account: AccountProgression
+  tutorial: TutorialSaveState
+}
+
+export type TutorialStep =
+  | 'welcome'
+  | 'equip'
+  | 'feed'
+  | 'begin'
+
+export interface TutorialSaveState {
+  completed: boolean
+  skipped: boolean
+  currentStep?: TutorialStep
 }
 
 interface SaveFile extends PersistentGameData {
+  version: 3
+}
+
+interface LegacyVersionTwoSave
+  extends Omit<
+    PersistentGameData,
+    'tutorial'
+  > {
   version: 2
 }
 
-interface LegacySaveFile
+interface LegacyVersionOneSave
   extends Omit<
     PersistentGameData,
-    'account'
+    'account' | 'tutorial'
   > {
   version: 1
 }
@@ -61,6 +84,18 @@ export function createDefaultAccount():
   }
 }
 
+export function createDefaultTutorialState():
+  TutorialSaveState {
+  return {
+    completed:
+      false,
+    skipped:
+      false,
+    currentStep:
+      'welcome',
+  }
+}
+
 export class PersistenceSystem {
   private static readonly storageKey =
     'project-redbox-save'
@@ -79,7 +114,11 @@ export class PersistenceSystem {
       const parsed: unknown =
         JSON.parse(raw)
 
-      if (this.isLegacySaveFile(parsed)) {
+      if (
+        this.isLegacyVersionOneSave(
+          parsed
+        )
+      ) {
         return this.clone({
           inventory:
             parsed.inventory,
@@ -91,6 +130,29 @@ export class PersistenceSystem {
             parsed.player,
           account:
             createDefaultAccount(),
+          tutorial:
+            createDefaultTutorialState(),
+        })
+      }
+
+      if (
+        this.isLegacyVersionTwoSave(
+          parsed
+        )
+      ) {
+        return this.clone({
+          inventory:
+            parsed.inventory,
+          equippedWeapon:
+            parsed.equippedWeapon,
+          mag:
+            parsed.mag,
+          player:
+            parsed.player,
+          account:
+            parsed.account,
+          tutorial:
+            createDefaultTutorialState(),
         })
       }
 
@@ -113,7 +175,7 @@ export class PersistenceSystem {
 
   save(data: PersistentGameData) {
     const saveFile: SaveFile = {
-      version: 2,
+      version: 3,
       ...this.clone(data),
     }
 
@@ -127,6 +189,146 @@ export class PersistenceSystem {
         'Could not write Project Redbox save.',
         error
       )
+    }
+  }
+
+  createFreshSave():
+    PersistentGameData {
+    const starterRifle:
+      WeaponItem = {
+      id:
+        'starter-rifle',
+      category:
+        'weapon',
+      weaponType:
+        'rifle',
+      rarity:
+        'common',
+      name:
+        'Standard Rifle',
+      attack:
+        10,
+      speed:
+        1.2,
+      criticalChance:
+        0.08,
+      criticalDamage:
+        1.5,
+    }
+
+    const inventory:
+      WeaponItem[] = [
+      {
+        id:
+          'test-greatsword-1',
+        category:
+          'weapon',
+        weaponType:
+          'greatsword',
+        rarity:
+          'rare',
+        name:
+          'Prototype Greatsword',
+        attack:
+          28,
+        speed:
+          0.85,
+        criticalChance:
+          0.18,
+        criticalDamage:
+          2,
+      },
+      {
+        id:
+          'test-scattergun-1',
+        category:
+          'weapon',
+        weaponType:
+          'scattergun',
+        rarity:
+          'uncommon',
+        name:
+          'Enhanced Scattergun',
+        attack:
+          16,
+        speed:
+          1.15,
+        criticalChance:
+          0.12,
+        criticalDamage:
+          1.6,
+      },
+      {
+        id:
+          'test-cannon-1',
+        category:
+          'weapon',
+        weaponType:
+          'cannon',
+        rarity:
+          'rare',
+        name:
+          'Prototype Cannon',
+        attack:
+          25,
+        speed:
+          0.75,
+        criticalChance:
+          0.08,
+        criticalDamage:
+          2.25,
+      },
+      {
+        id:
+          'test-rifle-1',
+        category:
+          'weapon',
+        weaponType:
+          'rifle',
+        rarity:
+          'uncommon',
+        name:
+          'Enhanced Rifle',
+        attack:
+          15,
+        speed:
+          1.4,
+        criticalChance:
+          0.2,
+        criticalDamage:
+          1.75,
+      },
+      starterRifle,
+    ]
+    const player =
+      createDefaultPlayerStats()
+
+    return {
+      inventory,
+      equippedWeapon:
+        starterRifle,
+      mag:
+        createStarterMag(),
+      player: {
+        level:
+          player.level,
+        currentXP:
+          player.currentXP,
+        xpToNextLevel:
+          player.xpToNextLevel,
+        maxHealth:
+          player.maxHealth,
+        power:
+          player.power,
+        defense:
+          player.defense,
+        speed:
+          player.speed,
+      },
+      account:
+        createDefaultAccount(),
+      tutorial:
+        createDefaultTutorialState(),
     }
   }
 
@@ -174,6 +376,9 @@ export class PersistenceSystem {
           ...data.account.lifetimeStats,
         },
       },
+      tutorial: {
+        ...data.tutorial,
+      },
     }
   }
 
@@ -182,7 +387,7 @@ export class PersistenceSystem {
   ): value is SaveFile {
     if (
       !this.isRecord(value) ||
-      value.version !== 2 ||
+      value.version !== 3 ||
       !Array.isArray(value.inventory) ||
       value.inventory.length > 30 ||
       !value.inventory.every(
@@ -196,7 +401,8 @@ export class PersistenceSystem {
       ) ||
       !this.isMag(value.mag) ||
       !this.isPlayer(value.player) ||
-      !this.isAccount(value.account)
+      !this.isAccount(value.account) ||
+      !this.isTutorial(value.tutorial)
     ) {
       return false
     }
@@ -215,9 +421,20 @@ export class PersistenceSystem {
     )
   }
 
-  private isLegacySaveFile(
+  private isLegacyVersionTwoSave(
     value: unknown
-  ): value is LegacySaveFile {
+  ): value is LegacyVersionTwoSave {
+    return (
+      this.isRecord(value) &&
+      value.version === 2 &&
+      this.hasValidCoreData(value) &&
+      this.isAccount(value.account)
+    )
+  }
+
+  private isLegacyVersionOneSave(
+    value: unknown
+  ): value is LegacyVersionOneSave {
     return (
       this.isRecord(value) &&
       value.version === 1 &&
@@ -336,6 +553,32 @@ export class PersistenceSystem {
       this.isInteger(
         value.lifetimeStats.bossesDefeated,
         0
+      )
+    )
+  }
+
+  private isTutorial(
+    value: unknown
+  ): value is TutorialSaveState {
+    return (
+      this.isRecord(value) &&
+      typeof value.completed ===
+        'boolean' &&
+      typeof value.skipped ===
+        'boolean' &&
+      (
+        value.currentStep ===
+          undefined ||
+        [
+          'welcome',
+          'equip',
+          'feed',
+          'begin',
+        ].includes(
+          String(
+            value.currentStep
+          )
+        )
       )
     )
   }

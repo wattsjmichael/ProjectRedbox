@@ -24,6 +24,10 @@ import type {
   RunSummary,
 } from '../runs/RunTypes'
 
+import {
+  HunterHubTutorial,
+} from '../tutorial/HunterHubTutorial'
+
 export class HunterBayScene
   extends Phaser.Scene {
   private readonly persistence =
@@ -53,6 +57,10 @@ export class HunterBayScene
   private statusMessage =
     ''
 
+  private tutorial:
+    HunterHubTutorial | null =
+    null
+
   constructor() {
     super(
       'HunterBayScene'
@@ -63,6 +71,10 @@ export class HunterBayScene
     summary?:
       RunSummary
   ) {
+    this.tutorial?.destroy()
+    this.tutorial =
+      null
+
     const saveData =
       this.persistence.load()
 
@@ -76,7 +88,12 @@ export class HunterBayScene
     this.saveData =
       saveData
     this.summary =
-      summary ?? null
+      summary &&
+      Array.isArray(
+        summary.recentFinds
+      )
+        ? summary
+        : null
     this.inventory =
       new InventorySystem()
     this.inventory.restore(
@@ -92,11 +109,55 @@ export class HunterBayScene
       this.getInitialSelection()
 
     this.render()
+
+    if (
+      !this.saveData.tutorial
+        .completed
+    ) {
+      this.tutorial =
+        new HunterHubTutorial({
+          scene:
+            this,
+          state:
+            this.saveData.tutorial,
+          hasEquippedWeapon:
+            () =>
+              this.inventory
+                .getEquippedItem() !==
+              null,
+          hasFeedableItem:
+            () =>
+              this.inventory
+                .getItems()
+                .some(
+                  item =>
+                    !this.inventory
+                      .isEquipped(
+                        item.id
+                      )
+                ),
+          onStateChanged:
+            () => {
+              this.save()
+            },
+        })
+
+      this.tutorial.start()
+    }
+
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        this.tutorial?.destroy()
+        this.tutorial =
+          null
+      }
+    )
   }
 
   private getInitialSelection() {
     const recentItem =
-      this.summary?.recentFinds.find(
+      this.summary?.recentFinds?.find(
         item =>
           this.inventory.getItem(
             item.id
@@ -124,6 +185,8 @@ export class HunterBayScene
     this.createItemDetails()
     this.createStatusMessage()
     this.createNavigation()
+
+    this.tutorial?.refresh()
   }
 
   private createBackdrop() {
@@ -799,6 +862,8 @@ export class HunterBayScene
           this.statusMessage =
             `${equippedItem.name.toUpperCase()} EQUIPPED`
           this.save()
+          this.tutorial
+            ?.onWeaponEquipped()
           this.render()
         }
       }
@@ -832,6 +897,8 @@ export class HunterBayScene
             .getItems()[0] ??
           null
         this.save()
+        this.tutorial
+          ?.onMagFed()
         this.render()
       }
     )
@@ -895,6 +962,26 @@ export class HunterBayScene
       'START NEXT DROP',
       0xe50914,
       () => {
+        if (
+          this.tutorial &&
+          !this.tutorial
+            .canLaunchDrop()
+        ) {
+          this.statusMessage =
+            'COMPLETE OR SKIP HUNTER ONBOARDING BEFORE LAUNCH'
+          this.render()
+          return
+        }
+
+        if (
+          this.tutorial &&
+          !this.saveData.tutorial
+            .completed
+        ) {
+          this.tutorial
+            .completeForLaunch()
+        }
+
         this.scene.start(
           'GameScene'
         )

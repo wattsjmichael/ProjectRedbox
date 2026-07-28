@@ -1,10 +1,39 @@
 import Phaser from 'phaser'
 
+import {
+  GAMEPLAY_ATLAS,
+} from '../assets/GameplayArt'
+
 export class BootScene
   extends Phaser.Scene {
   constructor() {
     super(
       'BootScene'
+    )
+  }
+
+  preload() {
+    this.load.on(
+      'loaderror',
+      (
+        file:
+          Phaser.Loader.File
+      ) => {
+        console.warn(
+          `Could not load art asset: ${file.key}`
+        )
+      }
+    )
+
+    this.load.spritesheet(
+      GAMEPLAY_ATLAS.key,
+      GAMEPLAY_ATLAS.path,
+      {
+        frameWidth:
+          GAMEPLAY_ATLAS.frameWidth,
+        frameHeight:
+          GAMEPLAY_ATLAS.frameHeight,
+      }
     )
   }
 

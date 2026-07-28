@@ -4,6 +4,13 @@ import type {
   PlayerStats,
 } from './PlayerStats'
 
+import {
+  GAMEPLAY_ATLAS,
+  GAMEPLAY_DISPLAY,
+  GAMEPLAY_FRAMES,
+  hasGameplayArt,
+} from '../assets/GameplayArt'
+
 interface PlayerConfig {
   scene: Phaser.Scene
 
@@ -32,6 +39,10 @@ export class Player {
 
   private object:
     Phaser.GameObjects.Rectangle
+
+  private visual:
+    Phaser.GameObjects.Sprite |
+    null = null
 
   private cursors:
     Phaser.Types.Input.Keyboard.CursorKeys
@@ -65,6 +76,34 @@ export class Player {
         32,
         0x00ff88
       )
+
+    if (
+      hasGameplayArt(
+        this.scene
+      )
+    ) {
+      this.object.setAlpha(
+        0
+      )
+
+      this.visual =
+        this.scene.add.sprite(
+          this.object.x,
+          this.object.y,
+          GAMEPLAY_ATLAS.key,
+          GAMEPLAY_FRAMES.hunter
+        )
+          .setDisplaySize(
+            GAMEPLAY_DISPLAY.hunter
+              .width,
+            GAMEPLAY_DISPLAY.hunter
+              .height
+          )
+          .setDepth(
+            GAMEPLAY_DISPLAY.hunter
+              .depth
+          )
+    }
 
     this.cursors =
       this.scene.input.keyboard!.createCursorKeys()
@@ -146,6 +185,37 @@ export class Player {
         16,
         this.worldHeight - 16
       )
+
+    this.visual?.setPosition(
+      this.object.x,
+      this.object.y
+    )
+  }
+
+  setAimTarget(
+    x: number,
+    y: number
+  ) {
+    if (!this.visual) {
+      return
+    }
+
+    const aimAngle =
+      Phaser.Math.Angle.Between(
+        this.object.x,
+        this.object.y,
+        x,
+        y
+      )
+
+    this.visual.setRotation(
+      aimAngle
+    )
+    this.visual.setFlipX(false)
+    this.visual.setFlipY(
+      Math.abs(aimAngle) >
+      Math.PI / 2
+    )
   }
 
   getObject() {
@@ -159,9 +229,15 @@ export class Player {
       return
     }
 
-    this.object.setFillStyle(
-      0xffffff
-    )
+    if (this.visual) {
+      this.visual.setTint(
+        0xff5555
+      )
+    } else {
+      this.object.setFillStyle(
+        0xffffff
+      )
+    }
 
     this.scene.time.delayedCall(
       100,
@@ -169,15 +245,25 @@ export class Player {
         if (
           this.object.active
         ) {
-          this.object.setFillStyle(
-            0x00ff88
-          )
+          if (this.visual) {
+            this.visual.clearTint()
+          } else {
+            this.object.setFillStyle(
+              0x00ff88
+            )
+          }
         }
       }
     )
   }
 
   destroy() {
+    if (
+      this.visual?.active
+    ) {
+      this.visual.destroy()
+    }
+
     if (
       this.object.active
     ) {

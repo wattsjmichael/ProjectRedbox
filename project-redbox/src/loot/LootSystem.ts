@@ -16,6 +16,13 @@ import type {
   LootDrop,
 } from './LootTypes'
 
+import {
+  GAMEPLAY_ATLAS,
+  GAMEPLAY_DISPLAY,
+  GAMEPLAY_FRAMES,
+  hasGameplayArt,
+} from '../assets/GameplayArt'
+
 interface LootSystemConfig {
   scene:
     Phaser.Scene
@@ -163,6 +170,11 @@ export class LootSystem {
         color
       )
 
+    this.attachLootVisual(
+      object,
+      false
+    )
+
     this.lootDrops.push({
       object,
       type: 'weapon',
@@ -189,6 +201,11 @@ export class LootSystem {
         22,
         0xff0000
       )
+
+    this.attachLootVisual(
+      object,
+      true
+    )
 
     this.lootDrops.push({
       object,
@@ -316,10 +333,23 @@ export class LootSystem {
         | Phaser.GameObjects.Rectangle
         | undefined
 
+    const visual =
+      loot.object.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+
     if (
       beam?.active
     ) {
       beam.destroy()
+    }
+
+    if (
+      visual?.active
+    ) {
+      visual.destroy()
     }
 
     if (
@@ -333,9 +363,29 @@ export class LootSystem {
     redBox:
       Phaser.GameObjects.Rectangle
   ) {
+    const visual =
+      redBox.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+    const target =
+      visual ??
+      redBox
+    const baseScaleX =
+      target.scaleX
+    const baseScaleY =
+      target.scaleY
+
     this.scene.tweens.add({
-      targets: redBox,
-      scale: 1.4,
+      targets:
+        target,
+      scaleX:
+        baseScaleX *
+        1.18,
+      scaleY:
+        baseScaleY *
+        1.18,
       alpha: 0.7,
       duration: 400,
       yoyo: true,
@@ -375,6 +425,50 @@ export class LootSystem {
     this.scene.cameras.main.shake(
       150,
       0.006
+    )
+  }
+
+  private attachLootVisual(
+    object:
+      Phaser.GameObjects.Rectangle,
+    rare:
+      boolean
+  ) {
+    if (
+      !hasGameplayArt(
+        this.scene
+      )
+    ) {
+      return
+    }
+
+    const display =
+      rare
+        ? GAMEPLAY_DISPLAY.lootRare
+        : GAMEPLAY_DISPLAY.lootCommon
+    const visual =
+      this.scene.add.sprite(
+        object.x,
+        object.y,
+        GAMEPLAY_ATLAS.key,
+        rare
+          ? GAMEPLAY_FRAMES.lootRare
+          : GAMEPLAY_FRAMES.lootCommon
+      )
+        .setDisplaySize(
+          display.width,
+          display.height
+        )
+        .setDepth(
+          display.depth
+        )
+
+    object.setAlpha(
+      0
+    )
+    object.setData(
+      'visual',
+      visual
     )
   }
 

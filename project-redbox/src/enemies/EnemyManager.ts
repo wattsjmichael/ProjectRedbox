@@ -12,6 +12,13 @@ import type {
   DropScaling,
 } from '../progression/DropScalingSystem'
 
+import {
+  GAMEPLAY_ATLAS,
+  GAMEPLAY_DISPLAY,
+  GAMEPLAY_FRAMES,
+  hasGameplayArt,
+} from '../assets/GameplayArt'
+
 interface EnemyManagerConfig {
   scene: Phaser.Scene
 
@@ -183,6 +190,22 @@ export class EnemyManager {
         stats.color
       )
 
+    const visual =
+      this.createEnemyVisual(
+        enemy,
+        type
+      )
+
+    if (visual) {
+      enemy.setAlpha(
+        0
+      )
+      enemy.setData(
+        'visual',
+        visual
+      )
+    }
+
     enemy.setData(
       'enemyType',
       type
@@ -209,7 +232,8 @@ export class EnemyManager {
       'elite'
     ) {
       this.createEliteEffect(
-        enemy
+        enemy,
+        visual
       )
     }
 
@@ -218,7 +242,8 @@ export class EnemyManager {
       'wyrm'
     ) {
       this.createWyrmEffect(
-        enemy
+        enemy,
+        visual
       )
 
       this.wyrm =
@@ -252,19 +277,28 @@ export class EnemyManager {
 
   private createEliteEffect(
     enemy:
-      Phaser.GameObjects.Rectangle
+      Phaser.GameObjects.Rectangle,
+    visual:
+      Phaser.GameObjects.Sprite |
+      null
   ) {
-    enemy.setStrokeStyle(
-      3,
-      0xffffff,
-      0.8
-    )
+    const target =
+      visual ??
+      enemy
+    const baseScaleX =
+      target.scaleX
+    const baseScaleY =
+      target.scaleY
 
     this.scene.tweens.add({
       targets:
-        enemy,
+        target,
 
-      scale:
+      scaleX:
+        baseScaleX *
+        1.12,
+      scaleY:
+        baseScaleY *
         1.12,
 
       duration:
@@ -276,32 +310,79 @@ export class EnemyManager {
       repeat:
         -1,
     })
+
+    const aura =
+      this.scene.add.circle(
+        enemy.x,
+        enemy.y,
+        39,
+        0xaa44ff,
+        0.08
+      )
+        .setStrokeStyle(
+          3,
+          0xcc77ff,
+          0.75
+        )
+        .setDepth(
+          GAMEPLAY_DISPLAY.enemyElite
+            .depth -
+          1
+        )
+
+    enemy.setData(
+      'eliteAura',
+      aura
+    )
+
+    this.scene.tweens.add({
+      targets:
+        aura,
+      alpha:
+        0.35,
+      scale:
+        1.12,
+      duration:
+        650,
+      yoyo:
+        true,
+      repeat:
+        -1,
+    })
   }
 
   private createWyrmEffect(
     wyrm:
-      Phaser.GameObjects.Rectangle
+      Phaser.GameObjects.Rectangle,
+    visual:
+      Phaser.GameObjects.Sprite |
+      null
   ) {
-    wyrm.setStrokeStyle(
-      5,
-      0xff4444,
-      1
+    const target =
+      visual ??
+      wyrm
+    const baseScaleX =
+      target.scaleX
+    const baseScaleY =
+      target.scaleY
+
+    target.setScale(
+      baseScaleX * 0.2,
+      baseScaleY * 0.2
     )
 
-    wyrm.setScale(
-      0.2
-    )
-
-    wyrm.setAlpha(
+    target.setAlpha(
       0
     )
 
     this.scene.tweens.add({
       targets:
-        wyrm,
+        target,
 
-      scale:
-        1,
+      scaleX:
+        baseScaleX,
+      scaleY:
+        baseScaleY,
 
       alpha:
         1,
@@ -434,6 +515,10 @@ export class EnemyManager {
         ) *
         movement
 
+      this.syncEnemyVisual(
+        enemy
+      )
+
       enemy.y +=
         Math.sin(
           angle
@@ -535,14 +620,30 @@ export class EnemyManager {
     })
 
     // Make Wyrm visually prepare.
+    const wyrmVisual =
+      this.wyrm.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+    const wyrmTarget =
+      wyrmVisual ??
+      this.wyrm
+    const wyrmScaleX =
+      wyrmTarget.scaleX
+    const wyrmScaleY =
+      wyrmTarget.scaleY
+
     this.scene.tweens.add({
       targets:
-        this.wyrm,
+        wyrmTarget,
 
       scaleX:
+        wyrmScaleX *
         1.2,
 
       scaleY:
+        wyrmScaleY *
         0.8,
 
       duration:
@@ -750,6 +851,10 @@ export class EnemyManager {
         0
     }
 
+    this.destroyEnemyVisual(
+      enemy
+    )
+
     if (
       enemy.active
     ) {
@@ -765,6 +870,9 @@ export class EnemyManager {
       if (
         enemy.active
       ) {
+        this.destroyEnemyVisual(
+          enemy
+        )
         enemy.destroy()
       }
     }
@@ -787,5 +895,121 @@ export class EnemyManager {
 
     this.wyrmSlamInProgress =
       false
+  }
+
+  private createEnemyVisual(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType
+  ) {
+    if (
+      !hasGameplayArt(
+        this.scene
+      )
+    ) {
+      return null
+    }
+
+    const frame =
+      type === 'wyrm'
+        ? GAMEPLAY_FRAMES.wyrm
+        : type === 'elite'
+          ? GAMEPLAY_FRAMES.enemyElite
+          : GAMEPLAY_FRAMES.enemyBasic
+    const display =
+      type === 'wyrm'
+        ? GAMEPLAY_DISPLAY.enemyBoss
+        : type === 'elite'
+          ? GAMEPLAY_DISPLAY.enemyElite
+          : GAMEPLAY_DISPLAY.enemyStandard
+
+    return this.scene.add.sprite(
+      enemy.x,
+      enemy.y,
+      GAMEPLAY_ATLAS.key,
+      frame
+    )
+      .setDisplaySize(
+        display.width,
+        display.height
+      )
+      .setDepth(
+        display.depth
+      )
+  }
+
+  private syncEnemyVisual(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    const visual =
+      enemy.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+
+    visual?.setPosition(
+      enemy.x,
+      enemy.y
+    )
+
+    if (visual) {
+      const facingAngle =
+        Phaser.Math.Angle.Between(
+          enemy.x,
+          enemy.y,
+          this.player.x,
+          this.player.y
+        )
+
+      visual.setRotation(
+        facingAngle
+      )
+      visual.setFlipX(false)
+      visual.setFlipY(
+        Math.abs(facingAngle) >
+        Math.PI / 2
+      )
+    }
+
+    const aura =
+      enemy.getData(
+        'eliteAura'
+      ) as
+        | Phaser.GameObjects.Arc
+        | undefined
+
+    aura?.setPosition(
+      enemy.x,
+      enemy.y
+    )
+  }
+
+  private destroyEnemyVisual(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    const visual =
+      enemy.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+    const aura =
+      enemy.getData(
+        'eliteAura'
+      ) as
+        | Phaser.GameObjects.Arc
+        | undefined
+
+    if (visual?.active) {
+      visual.destroy()
+    }
+
+    if (aura?.active) {
+      aura.destroy()
+    }
   }
 }

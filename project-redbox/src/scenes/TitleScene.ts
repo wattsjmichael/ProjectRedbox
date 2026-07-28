@@ -278,8 +278,23 @@ export class TitleScene
     this.time.delayedCall(
       150,
       () => {
+        let saveData =
+          this.persistence.load()
+
+        if (!saveData) {
+          saveData =
+            this.persistence
+              .createFreshSave()
+          this.persistence.save(
+            saveData
+          )
+        }
+
         this.scene.start(
-          'GameScene'
+          saveData.tutorial
+            .completed
+            ? 'GameScene'
+            : 'HunterBayScene'
         )
       }
     )

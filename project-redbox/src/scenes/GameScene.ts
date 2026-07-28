@@ -66,6 +66,7 @@ import {
 
 import {
   createDefaultAccount,
+  createDefaultTutorialState,
   PersistenceSystem,
 } from '../persistence/PersistenceSystem'
 
@@ -175,6 +176,15 @@ export class GameScene
     this.loadedSave =
       this.persistence.load()
 
+    if (!this.loadedSave) {
+      this.loadedSave =
+        this.persistence
+          .createFreshSave()
+      this.persistence.save(
+        this.loadedSave
+      )
+    }
+
     this.account =
       this.loadedSave?.account ??
       createDefaultAccount()
@@ -256,103 +266,6 @@ export class GameScene
       return
     }
 
-    const testItems: WeaponItem[] = [
-      {
-        id: 'test-greatsword-1',
-        category: 'weapon',
-        weaponType: 'greatsword',
-        rarity: 'rare',
-        name: 'Prototype Greatsword',
-        attack: 28,
-        speed: 0.85,
-        criticalChance: 0.18,
-        criticalDamage: 2.0,
-      },
-      {
-        id: 'test-scattergun-1',
-        category: 'weapon',
-        weaponType: 'scattergun',
-        rarity: 'uncommon',
-        name: 'Enhanced Scattergun',
-        attack: 16,
-        speed: 1.15,
-        criticalChance: 0.12,
-        criticalDamage: 1.6,
-      },
-      {
-        id: 'test-cannon-1',
-        category: 'weapon',
-        weaponType: 'cannon',
-        rarity: 'rare',
-        name: 'Prototype Cannon',
-        attack: 25,
-        speed: 0.75,
-        criticalChance: 0.08,
-        criticalDamage: 2.25,
-      },
-      {
-        id: 'test-rifle-1',
-        category: 'weapon',
-        weaponType: 'rifle',
-        rarity: 'uncommon',
-        name: 'Enhanced Rifle',
-        attack: 15,
-        speed: 1.4,
-        criticalChance: 0.2,
-        criticalDamage: 1.75,
-      },
-    ]
-
-    for (
-      const item of
-      testItems
-    ) {
-      this.inventorySystem.addItem(
-        item
-      )
-    }
-
-    const starterRifle:
-      WeaponItem = {
-      id:
-        'starter-rifle',
-
-      category:
-        'weapon',
-
-      weaponType:
-        'rifle',
-
-      rarity:
-        'common',
-
-      name:
-        'Standard Rifle',
-
-      attack:
-        10,
-
-      speed:
-        1.2,
-
-      criticalChance:
-        0.08,
-
-      criticalDamage:
-        1.5,
-    }
-
-    this.inventorySystem.setEquippedItem(
-      starterRifle
-    )
-
-    this.weaponSystem.equipWeapon(
-      starterRifle
-    )
-
-    this.hud.updateWeapon(
-      starterRifle.name
-    )
   }
 
   private createInventoryUI() {
@@ -1114,6 +1027,11 @@ export class GameScene
     const pointer =
       this.input.activePointer
 
+    this.player.setAimTarget(
+      pointer.worldX,
+      pointer.worldY
+    )
+
     this.weaponSystem.update(
       delta,
       pointer.worldX,
@@ -1708,6 +1626,10 @@ export class GameScene
       },
       account:
         this.account,
+      tutorial:
+        this.loadedSave
+          ?.tutorial ??
+        createDefaultTutorialState(),
     })
   }
 

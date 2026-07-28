@@ -20,6 +20,13 @@ import type {
   EnemyType,
 } from '../enemies/EnemyTypes'
 
+import {
+  GAMEPLAY_ATLAS,
+  GAMEPLAY_DISPLAY,
+  GAMEPLAY_FRAMES,
+  hasGameplayArt,
+} from '../assets/GameplayArt'
+
 export interface ComboState {
   step: number
   elapsed: number
@@ -239,6 +246,17 @@ this.getMagEnergyMultiplier =
       const bullet of
       this.bullets
     ) {
+      const visual =
+        bullet.getData(
+          'visual'
+        ) as
+          | Phaser.GameObjects.Sprite
+          | undefined
+
+      if (visual?.active) {
+        visual.destroy()
+      }
+
       if (
         bullet.active
       ) {
@@ -1170,17 +1188,41 @@ update(
       direction.y *
       beamLength
 
-    const beam =
-      this.scene.add.rectangle(
-        startX,
-        startY,
-        beamLength,
-        beamWidth,
-        comboStep === 3
-          ? 0x88ffff
-          : 0x00ffff,
-        0.9
+    const beam:
+      | Phaser.GameObjects.Sprite
+      | Phaser.GameObjects.Rectangle =
+      hasGameplayArt(
+        this.scene
       )
+        ? this.scene.add
+          .sprite(
+            startX,
+            startY,
+            GAMEPLAY_ATLAS.key,
+            GAMEPLAY_FRAMES
+              .projectilePhoton
+          )
+          .setDisplaySize(
+            beamLength,
+            beamWidth *
+            1.8
+          )
+          .setDepth(
+            GAMEPLAY_DISPLAY
+              .projectileLarge
+              .depth
+          )
+        : this.scene.add
+          .rectangle(
+            startX,
+            startY,
+            beamLength,
+            beamWidth,
+            comboStep === 3
+              ? 0x88ffff
+              : 0x00ffff,
+            0.9
+          )
 
     beam.setOrigin(
       0,
@@ -1363,6 +1405,58 @@ update(
         color
       )
 
+    if (
+      hasGameplayArt(
+        this.scene
+      )
+    ) {
+      const frame =
+        weaponType === 'rifle'
+          ? GAMEPLAY_FRAMES
+            .projectileRifle
+          : weaponType ===
+              'scattergun'
+            ? GAMEPLAY_FRAMES
+              .projectileScattergun
+            : GAMEPLAY_FRAMES
+              .projectileCannon
+      const display =
+        weaponType === 'cannon'
+          ? GAMEPLAY_DISPLAY
+            .projectileLarge
+          : weaponType ===
+              'scattergun'
+            ? GAMEPLAY_DISPLAY
+              .projectileScatter
+            : GAMEPLAY_DISPLAY
+              .projectileSmall
+      const visual =
+        this.scene.add.sprite(
+          bullet.x,
+          bullet.y,
+          GAMEPLAY_ATLAS.key,
+          frame
+        )
+          .setDisplaySize(
+            display.width,
+            display.height
+          )
+          .setDepth(
+            display.depth
+          )
+          .setRotation(
+            direction.angle()
+          )
+
+      bullet.setAlpha(
+        0
+      )
+      bullet.setData(
+        'visual',
+        visual
+      )
+    }
+
     bullet.setRotation(
       direction.angle()
     )
@@ -1455,6 +1549,18 @@ update(
       bullet.y +=
         direction.y *
         distance
+
+      const visual =
+        bullet.getData(
+          'visual'
+        ) as
+          | Phaser.GameObjects.Sprite
+          | undefined
+
+      visual?.setPosition(
+        bullet.x,
+        bullet.y
+      )
 
       const hitEnemy =
         this.checkBulletCollision(
@@ -1843,9 +1949,22 @@ private calculateDamage(
         : 35
     )
 
-    enemy.setFillStyle(
-      0xffffff
-    )
+    const visual =
+      enemy.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+
+    if (visual) {
+      visual.setTint(
+        0xff7777
+      )
+    } else {
+      enemy.setFillStyle(
+        0xffffff
+      )
+    }
 
     this.scene.time.delayedCall(
       comboStep === 3
@@ -1855,16 +1974,20 @@ private calculateDamage(
         if (
           enemy.active
         ) {
-          enemy.setFillStyle(
-            ENEMY_STATS[
-              (
-                enemy.getData(
-                  'enemyType'
-                ) ??
-                'normal'
-              ) as EnemyType
-            ].color
-          )
+          if (visual?.active) {
+            visual.clearTint()
+          } else {
+            enemy.setFillStyle(
+              ENEMY_STATS[
+                (
+                  enemy.getData(
+                    'enemyType'
+                  ) ??
+                  'normal'
+                ) as EnemyType
+              ].color
+            )
+          }
         }
       }
     )
@@ -1877,6 +2000,17 @@ private calculateDamage(
     index:
       number
   ) {
+    const visual =
+      bullet.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+
+    if (visual?.active) {
+      visual.destroy()
+    }
+
     if (
       bullet.active
     ) {
