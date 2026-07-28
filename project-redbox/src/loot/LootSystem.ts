@@ -17,10 +17,9 @@ import type {
 } from './LootTypes'
 
 import {
-  GAMEPLAY_ATLAS,
   GAMEPLAY_DISPLAY,
-  GAMEPLAY_FRAMES,
-  hasGameplayArt,
+  GAMEPLAY_TEXTURES,
+  hasGameplayTexture,
 } from '../assets/GameplayArt'
 
 interface LootSystemConfig {
@@ -434,9 +433,16 @@ export class LootSystem {
     rare:
       boolean
   ) {
+    const texture =
+      rare
+        ? GAMEPLAY_TEXTURES.redBox
+        : GAMEPLAY_TEXTURES
+          .lootWeapon
+
     if (
-      !hasGameplayArt(
-        this.scene
+      !hasGameplayTexture(
+        this.scene,
+        texture.key
       )
     ) {
       return
@@ -445,15 +451,13 @@ export class LootSystem {
     const display =
       rare
         ? GAMEPLAY_DISPLAY.lootRare
-        : GAMEPLAY_DISPLAY.lootCommon
+        : GAMEPLAY_DISPLAY
+          .lootCommon
     const visual =
       this.scene.add.sprite(
         object.x,
         object.y,
-        GAMEPLAY_ATLAS.key,
-        rare
-          ? GAMEPLAY_FRAMES.lootRare
-          : GAMEPLAY_FRAMES.lootCommon
+        texture.key
       )
         .setDisplaySize(
           display.width,
@@ -463,9 +467,7 @@ export class LootSystem {
           display.depth
         )
 
-    object.setAlpha(
-      0
-    )
+    object.setAlpha(0)
     object.setData(
       'visual',
       visual

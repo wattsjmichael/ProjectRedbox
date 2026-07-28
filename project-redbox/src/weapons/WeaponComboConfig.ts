@@ -6,6 +6,7 @@ export interface WeaponComboTiming {
   attackDuration: number
   earliestNextInput: number
   latestComboInput: number
+  inputBufferMs: number
   finisherRecovery: number
   damageMultipliers:
     readonly [
@@ -24,6 +25,7 @@ export const WEAPON_COMBO_TIMINGS:
       attackDuration: 260,
       earliestNextInput: 140,
       latestComboInput: 650,
+      inputBufferMs: 100,
       finisherRecovery: 350,
       damageMultipliers: [
         1,
@@ -32,9 +34,10 @@ export const WEAPON_COMBO_TIMINGS:
       ],
     },
     scattergun: {
-      attackDuration: 520,
-      earliestNextInput: 260,
-      latestComboInput: 900,
+      attackDuration: 500,
+      earliestNextInput: 280,
+      latestComboInput: 880,
+      inputBufferMs: 130,
       finisherRecovery: 500,
       damageMultipliers: [
         1,
@@ -43,10 +46,11 @@ export const WEAPON_COMBO_TIMINGS:
       ],
     },
     cannon: {
-      attackDuration: 800,
-      earliestNextInput: 420,
-      latestComboInput: 1200,
-      finisherRecovery: 700,
+      attackDuration: 760,
+      earliestNextInput: 440,
+      latestComboInput: 1160,
+      inputBufferMs: 160,
+      finisherRecovery: 650,
       damageMultipliers: [
         1,
         1.08,
@@ -54,10 +58,11 @@ export const WEAPON_COMBO_TIMINGS:
       ],
     },
     photonLance: {
-      attackDuration: 620,
-      earliestNextInput: 300,
-      latestComboInput: 950,
-      finisherRecovery: 550,
+      attackDuration: 480,
+      earliestNextInput: 240,
+      latestComboInput: 800,
+      inputBufferMs: 110,
+      finisherRecovery: 460,
       damageMultipliers: [
         1,
         1.1,
@@ -68,6 +73,7 @@ export const WEAPON_COMBO_TIMINGS:
       attackDuration: 700,
       earliestNextInput: 180,
       latestComboInput: 700,
+      inputBufferMs: 140,
       finisherRecovery: 450,
       damageMultipliers: [
         1,

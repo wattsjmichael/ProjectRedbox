@@ -12,19 +12,14 @@ import {
   WEAPON_COMBO_TIMINGS,
 } from './WeaponComboConfig'
 
-import {
-  ENEMY_STATS,
-} from '../enemies/EnemyTypes'
-
 import type {
-  EnemyType,
-} from '../enemies/EnemyTypes'
+  CombatFeedbackManager,
+} from '../combat/CombatFeedbackManager'
 
 import {
-  GAMEPLAY_ATLAS,
   GAMEPLAY_DISPLAY,
-  GAMEPLAY_FRAMES,
-  hasGameplayArt,
+  GAMEPLAY_TEXTURES,
+  hasGameplayTexture,
 } from '../assets/GameplayArt'
 
 export interface ComboState {
@@ -35,6 +30,8 @@ export interface ComboState {
   perfectEnd: number
   failed: boolean
   perfect: boolean
+  queued: boolean
+  finisherReady: boolean
 }
 
 interface WeaponSystemConfig {
@@ -84,8 +81,11 @@ getMagAttackMultiplier:
 getMagCriticalChanceBonus:
   () => number
 
-getMagEnergyMultiplier:
+  getMagEnergyMultiplier:
   () => number
+
+  feedback:
+    CombatFeedbackManager
 }
 
 export class WeaponSystem {
@@ -130,6 +130,9 @@ private getMagCriticalChanceBonus:
 
 private getMagEnergyMultiplier:
   WeaponSystemConfig['getMagEnergyMultiplier']
+
+  private feedback:
+    CombatFeedbackManager
 
   private enabled =
     true
@@ -214,6 +217,9 @@ this.getMagCriticalChanceBonus =
 
 this.getMagEnergyMultiplier =
   config.getMagEnergyMultiplier
+
+    this.feedback =
+      config.feedback
 
     this.setupAttackInput()
   }
@@ -417,6 +423,14 @@ update(
       perfect:
         options.perfect ??
         false,
+
+      queued:
+        this.inputQueued,
+
+      finisherReady:
+        this.comboStep === 2 &&
+        this.comboTimer >=
+          timing.earliestNextInput,
     })
   }
 
@@ -495,11 +509,24 @@ update(
 
     if (
       this.comboTimer <
-      timing.earliestNextInput ||
-      this.meleeLocked
+      timing.earliestNextInput
     ) {
+      if (
+        this.comboTimer >=
+        timing.earliestNextInput -
+          timing.inputBufferMs
+      ) {
+        this.inputQueued =
+          true
+        this.emitComboState()
+      }
+      return
+    }
+
+    if (this.meleeLocked) {
       this.inputQueued =
         true
+      this.emitComboState()
       return
     }
 
@@ -750,30 +777,10 @@ update(
       )
     }
 
-    if (
-      this.comboStep ===
-      3
-    ) {
-      this.scene.cameras.main.shake(
-        perfect
-          ? 180
-          : 140,
-
-        perfect
-          ? 0.018
-          : 0.012
-      )
-    } else {
-      this.scene.cameras.main.shake(
-        perfect
-          ? 80
-          : 60,
-
-        perfect
-          ? 0.007
-          : 0.004
-      )
-    }
+    this.feedback.playAttack(
+      'greatsword',
+      this.comboStep
+    )
 
     this.scene.time.delayedCall(
       lockDuration,
@@ -834,6 +841,17 @@ update(
       )
     }
 
+    this.feedback.playHit(
+      enemy,
+      'greatsword',
+      comboStep,
+      {
+        critical:
+          damageResult.critical,
+        perfect,
+      }
+    )
+
     if (
       newHealth <=
       0
@@ -844,11 +862,6 @@ update(
 
       return
     }
-
-    this.flashEnemy(
-      enemy,
-      comboStep
-    )
 
     let knockback =
       comboStep === 3
@@ -1040,12 +1053,10 @@ update(
       0xffff55
     )
 
-    if (comboStep === 3) {
-      this.scene.cameras.main.shake(
-        55,
-        0.003
-      )
-    }
+    this.feedback.playAttack(
+      'rifle',
+      comboStep
+    )
   }
 
   private fireScattergun(
@@ -1104,12 +1115,10 @@ update(
       0xffaa00
     )
 
-    if (comboStep === 3) {
-      this.scene.cameras.main.shake(
-        90,
-        0.008
-      )
-    }
+    this.feedback.playAttack(
+      'scattergun',
+      comboStep
+    )
   }
 
   private fireCannon(
@@ -1140,13 +1149,9 @@ update(
       0xff5533
     )
 
-    this.scene.cameras.main.shake(
-      comboStep === 3
-        ? 150
-        : 65,
-      comboStep === 3
-        ? 0.012
-        : 0.004
+    this.feedback.playAttack(
+      'cannon',
+      comboStep
     )
   }
 
@@ -1191,38 +1196,32 @@ update(
     const beam:
       | Phaser.GameObjects.Sprite
       | Phaser.GameObjects.Rectangle =
-      hasGameplayArt(
-        this.scene
+      hasGameplayTexture(
+        this.scene,
+        GAMEPLAY_TEXTURES
+          .projectilePhoton.key
       )
-        ? this.scene.add
-          .sprite(
-            startX,
-            startY,
-            GAMEPLAY_ATLAS.key,
-            GAMEPLAY_FRAMES
-              .projectilePhoton
-          )
+        ? this.scene.add.sprite(
+          startX,
+          startY,
+          GAMEPLAY_TEXTURES
+            .projectilePhoton.key
+        )
           .setDisplaySize(
             beamLength,
-            beamWidth *
-            1.8
+            beamWidth
           )
-          .setDepth(
-            GAMEPLAY_DISPLAY
-              .projectileLarge
-              .depth
-          )
-        : this.scene.add
-          .rectangle(
-            startX,
-            startY,
-            beamLength,
-            beamWidth,
-            comboStep === 3
-              ? 0x88ffff
-              : 0x00ffff,
-            0.9
-          )
+          .setDepth(15)
+        : this.scene.add.rectangle(
+          startX,
+          startY,
+          beamLength,
+          beamWidth,
+          comboStep === 3
+            ? 0x88ffff
+            : 0x00ffff,
+          0.9
+        )
 
     beam.setOrigin(
       0,
@@ -1327,17 +1326,22 @@ update(
         )
       }
 
+      this.feedback.playHit(
+        enemy,
+        'photonLance',
+        comboStep,
+        {
+          critical:
+            damageResult.critical,
+        }
+      )
+
       if (
         newHealth <=
         0
       ) {
         this.killEnemy(
           enemy
-        )
-      } else {
-        this.flashEnemy(
-          enemy,
-          comboStep
         )
       }
     }
@@ -1361,13 +1365,9 @@ update(
         },
     })
 
-    this.scene.cameras.main.shake(
-      comboStep === 3
-        ? 130
-        : 70,
-      comboStep === 3
-        ? 0.009
-        : 0.003
+    this.feedback.playAttack(
+      'photonLance',
+      comboStep
     )
   }
 
@@ -1405,37 +1405,38 @@ update(
         color
       )
 
+    const texture =
+      weaponType === 'rifle'
+        ? GAMEPLAY_TEXTURES
+          .projectileRifle
+        : weaponType ===
+            'scattergun'
+          ? GAMEPLAY_TEXTURES
+            .projectileScatter
+          : GAMEPLAY_TEXTURES
+            .projectileCannon
+    const display =
+      weaponType === 'rifle'
+        ? GAMEPLAY_DISPLAY
+          .projectileRifle
+        : weaponType ===
+            'scattergun'
+          ? GAMEPLAY_DISPLAY
+            .projectileScatter
+          : GAMEPLAY_DISPLAY
+            .projectileCannon
+
     if (
-      hasGameplayArt(
-        this.scene
+      hasGameplayTexture(
+        this.scene,
+        texture.key
       )
     ) {
-      const frame =
-        weaponType === 'rifle'
-          ? GAMEPLAY_FRAMES
-            .projectileRifle
-          : weaponType ===
-              'scattergun'
-            ? GAMEPLAY_FRAMES
-              .projectileScattergun
-            : GAMEPLAY_FRAMES
-              .projectileCannon
-      const display =
-        weaponType === 'cannon'
-          ? GAMEPLAY_DISPLAY
-            .projectileLarge
-          : weaponType ===
-              'scattergun'
-            ? GAMEPLAY_DISPLAY
-              .projectileScatter
-            : GAMEPLAY_DISPLAY
-              .projectileSmall
       const visual =
         this.scene.add.sprite(
           bullet.x,
           bullet.y,
-          GAMEPLAY_ATLAS.key,
-          frame
+          texture.key
         )
           .setDisplaySize(
             display.width,
@@ -1448,9 +1449,7 @@ update(
             direction.angle()
           )
 
-      bullet.setAlpha(
-        0
-      )
+      bullet.setAlpha(0)
       bullet.setData(
         'visual',
         visual
@@ -1679,17 +1678,22 @@ update(
         )
       }
 
+      this.feedback.playHit(
+        enemy,
+        weaponType,
+        comboStep,
+        {
+          critical:
+            damageResult.critical,
+        }
+      )
+
       if (
         newHealth <=
         0
       ) {
         this.killEnemy(
           enemy
-        )
-      } else {
-        this.flashEnemy(
-          enemy,
-          comboStep
         )
       }
 
@@ -1930,67 +1934,6 @@ private calculateDamage(
       y
     )
 
-    this.scene.cameras.main.shake(
-      50,
-      0.005
-    )
-  }
-
-  private flashEnemy(
-    enemy:
-      Phaser.GameObjects.Rectangle,
-    comboStep =
-      1
-  ) {
-    enemy.setData(
-      'hitStopRemaining',
-      comboStep === 3
-        ? 70
-        : 35
-    )
-
-    const visual =
-      enemy.getData(
-        'visual'
-      ) as
-        | Phaser.GameObjects.Sprite
-        | undefined
-
-    if (visual) {
-      visual.setTint(
-        0xff7777
-      )
-    } else {
-      enemy.setFillStyle(
-        0xffffff
-      )
-    }
-
-    this.scene.time.delayedCall(
-      comboStep === 3
-        ? 115
-        : 75,
-      () => {
-        if (
-          enemy.active
-        ) {
-          if (visual?.active) {
-            visual.clearTint()
-          } else {
-            enemy.setFillStyle(
-              ENEMY_STATS[
-                (
-                  enemy.getData(
-                    'enemyType'
-                  ) ??
-                  'normal'
-                ) as EnemyType
-              ].color
-            )
-          }
-        }
-      }
-    )
   }
 
   private removeBullet(
@@ -2049,6 +1992,9 @@ private calculateDamage(
         speed,
       latestComboInput:
         base.latestComboInput /
+        speed,
+      inputBufferMs:
+        base.inputBufferMs /
         speed,
       finisherRecovery:
         base.finisherRecovery /

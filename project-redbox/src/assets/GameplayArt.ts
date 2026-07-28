@@ -3,126 +3,169 @@ import type Phaser from 'phaser'
 let missingArtWarningShown =
   false
 
-export const GAMEPLAY_ATLAS = {
-  key:
-    'redbox-gameplay-atlas',
-  path:
-    'assets/sprites/redbox_sprite_atlas.png',
-  frameWidth:
-    362,
-  frameHeight:
-    362,
-} as const
-
-export const GAMEPLAY_FRAMES = {
-  hunter:
-    0,
-  enemyBasic:
-    1,
-  enemyFast:
-    2,
-  enemyTank:
-    3,
-  enemyElite:
-    4,
-  wyrm:
-    5,
-  projectileRifle:
-    6,
-  projectileScattergun:
-    7,
-  projectileCannon:
-    8,
-  projectilePhoton:
-    9,
-  lootRare:
-    10,
-  lootCommon:
-    11,
+export const GAMEPLAY_TEXTURES = {
+  hunterProof: {
+    key:
+      'hunter-temp-v3',
+    path:
+      'assets/sprites/temp-ai/hunter/hunter_temp_v3_gameplay.png',
+  },
+  enemyBasicProof: {
+    key:
+      'enemy-basic-temp-v3',
+    path:
+      'assets/sprites/temp-ai/enemies/enemy_basic_temp_v3_gameplay.png',
+  },
+  enemyElite: {
+    key:
+      'enemy-elite-temp-v1',
+    path:
+      'assets/sprites/temp-ai/enemies/enemy_elite_temp_v1_gameplay.png',
+  },
+  wyrm: {
+    key:
+      'wyrm-temp-v1',
+    path:
+      'assets/sprites/temp-ai/boss/wyrm_temp_v1_gameplay.png',
+  },
+  projectileRifle: {
+    key:
+      'projectile-rifle-temp-v1',
+    path:
+      'assets/sprites/temp-ai/projectiles/projectile_rifle_temp_v1_gameplay.png',
+  },
+  projectileScatter: {
+    key:
+      'projectile-scatter-temp-v1',
+    path:
+      'assets/sprites/temp-ai/projectiles/projectile_scatter_temp_v1_gameplay.png',
+  },
+  projectileCannon: {
+    key:
+      'projectile-cannon-temp-v1',
+    path:
+      'assets/sprites/temp-ai/projectiles/projectile_cannon_temp_v1_gameplay.png',
+  },
+  projectilePhoton: {
+    key:
+      'projectile-photon-temp-v1',
+    path:
+      'assets/sprites/temp-ai/projectiles/projectile_photon_temp_v1_gameplay.png',
+  },
+  lootWeapon: {
+    key:
+      'loot-weapon-temp-v1',
+    path:
+      'assets/sprites/temp-ai/loot/loot_weapon_temp_v1_gameplay.png',
+  },
+  redBox: {
+    key:
+      'red-box-temp-v1',
+    path:
+      'assets/sprites/temp-ai/loot/red_box_temp_v1_gameplay.png',
+  },
 } as const
 
 export const GAMEPLAY_DISPLAY = {
   hunter: {
     width:
-      108,
+      91,
     height:
-      108,
+      64,
+    originX:
+      0.31,
+    originY:
+      0.55,
     depth:
       20,
   },
   enemyStandard: {
     width:
-      48,
+      64,
     height:
-      48,
+      49,
+    originX:
+      0.5,
+    originY:
+      0.52,
     depth:
       10,
   },
   enemyElite: {
     width:
-      66,
+      82,
     height:
-      66,
+      60,
+    originX:
+      0.5,
+    originY:
+      0.52,
     depth:
       11,
   },
   enemyBoss: {
     width:
-      150,
+      180,
     height:
-      150,
+      93,
+    originX:
+      0.5,
+    originY:
+      0.5,
     depth:
       12,
   },
-  projectileSmall: {
+  projectileRifle: {
     width:
-      22,
+      18,
     height:
-      10,
+      8,
     depth:
       15,
   },
   projectileScatter: {
     width:
-      14,
+      12,
     height:
       8,
     depth:
       15,
   },
-  projectileLarge: {
+  projectileCannon: {
     width:
-      30,
+      32,
     height:
-      24,
+      18,
     depth:
       15,
   },
   lootCommon: {
     width:
-      68,
+      32,
     height:
-      48,
+      22,
     depth:
       8,
   },
   lootRare: {
     width:
-      84,
+      44,
     height:
-      84,
+      44,
     depth:
       9,
   },
 } as const
 
-export function hasGameplayArt(
+export function hasGameplayTexture(
   scene:
-    Phaser.Scene
+    Phaser.Scene,
+  key:
+    string
 ) {
   const available =
     scene.textures.exists(
-      GAMEPLAY_ATLAS.key
+      key
     )
 
   if (
@@ -132,7 +175,7 @@ export function hasGameplayArt(
     missingArtWarningShown =
       true
     console.warn(
-      'Project Redbox gameplay atlas is missing; using geometry fallbacks.'
+      `Project Redbox proof asset "${key}" is missing; using the geometry fallback.`
     )
   }
 

@@ -53,6 +53,10 @@ import {
 } from '../ui/HUD'
 
 import {
+  CombatFeedbackManager,
+} from '../combat/CombatFeedbackManager'
+
+import {
   InventorySystem,
 } from '../inventory/InventorySystem'
 
@@ -96,6 +100,9 @@ export class GameScene
 
   private weaponSystem!:
     WeaponSystem
+
+  private combatFeedback!:
+    CombatFeedbackManager
 
   private lootSystem!:
     LootSystem
@@ -212,6 +219,11 @@ export class GameScene
     this.setupCamera()
 
     this.createHUD()
+
+    this.combatFeedback =
+      new CombatFeedbackManager(
+        this
+      )
 
     this.createWeaponSystem()
 
@@ -647,6 +659,9 @@ export class GameScene
             )
           },
 
+        feedback:
+          this.combatFeedback,
+
         killEnemy:
           (
             enemy
@@ -675,7 +690,9 @@ export class GameScene
               state.perfectStart,
               state.perfectEnd,
               state.failed,
-              state.perfect
+              state.perfect,
+              state.queued,
+              state.finisherReady
             )
           },
 
@@ -1290,10 +1307,8 @@ export class GameScene
 
     this.player.showDamageFlash()
 
-    this.cameras.main.shake(
-      120,
-      0.008
-    )
+    this.combatFeedback
+      .playPlayerHit()
 
     if (
       this.playerStats.health <=
@@ -1312,6 +1327,12 @@ export class GameScene
 
     this.isGameOver =
       true
+
+    this.weaponSystem.setEnabled(
+      false
+    )
+
+    this.combatFeedback.stop()
 
     this.playerStats.health =
       0
@@ -1387,6 +1408,12 @@ export class GameScene
         enemy
       )
 
+    this.combatFeedback
+      .playEnemyDeath(
+        enemy,
+        enemyType
+      )
+
     this.enemyManager.removeEnemy(
       enemy
     )
@@ -1402,11 +1429,6 @@ export class GameScene
         y
       )
     } else {
-      this.createDeathBurst(
-        x,
-        y
-      )
-
       this.lootSystem.tryDrop(
         x,
         y
@@ -1732,6 +1754,11 @@ export class GameScene
     this.runFinalized =
       true
 
+    this.weaponSystem.setEnabled(
+      false
+    )
+    this.combatFeedback.stop()
+
     const summary:
       RunSummary = {
       outcome,
@@ -1883,74 +1910,4 @@ export class GameScene
     })
   }
 
-  private createDeathBurst(
-    x:
-      number,
-
-    y:
-      number
-  ) {
-    for (
-      let i = 0;
-      i < 8;
-      i++
-    ) {
-      const particle =
-        this.add.rectangle(
-          x,
-          y,
-          6,
-          6,
-          0xff8844
-        )
-
-      const angle =
-        Phaser.Math.FloatBetween(
-          0,
-          Math.PI * 2
-        )
-
-      const speed =
-        Phaser.Math.FloatBetween(
-          80,
-          180
-        )
-
-      this.tweens.add({
-        targets:
-          particle,
-
-        x:
-          x +
-          Math.cos(
-            angle
-          ) *
-          speed,
-
-        y:
-          y +
-          Math.sin(
-            angle
-          ) *
-          speed,
-
-        alpha:
-          0,
-
-        scale:
-          0,
-
-        duration:
-          300,
-
-        ease:
-          'Power2',
-
-        onComplete:
-          () => {
-            particle.destroy()
-          },
-      })
-    }
-  }
 }

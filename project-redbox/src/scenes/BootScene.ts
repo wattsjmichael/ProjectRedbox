@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 
 import {
-  GAMEPLAY_ATLAS,
+  GAMEPLAY_TEXTURES,
 } from '../assets/GameplayArt'
 
 export class BootScene
@@ -25,16 +25,17 @@ export class BootScene
       }
     )
 
-    this.load.spritesheet(
-      GAMEPLAY_ATLAS.key,
-      GAMEPLAY_ATLAS.path,
-      {
-        frameWidth:
-          GAMEPLAY_ATLAS.frameWidth,
-        frameHeight:
-          GAMEPLAY_ATLAS.frameHeight,
-      }
-    )
+    for (
+      const texture of
+      Object.values(
+        GAMEPLAY_TEXTURES
+      )
+    ) {
+      this.load.image(
+        texture.key,
+        texture.path
+      )
+    }
   }
 
   create() {

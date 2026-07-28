@@ -5,10 +5,9 @@ import type {
 } from './PlayerStats'
 
 import {
-  GAMEPLAY_ATLAS,
   GAMEPLAY_DISPLAY,
-  GAMEPLAY_FRAMES,
-  hasGameplayArt,
+  GAMEPLAY_TEXTURES,
+  hasGameplayTexture,
 } from '../assets/GameplayArt'
 
 interface PlayerConfig {
@@ -78,8 +77,10 @@ export class Player {
       )
 
     if (
-      hasGameplayArt(
-        this.scene
+      hasGameplayTexture(
+        this.scene,
+        GAMEPLAY_TEXTURES
+          .hunterProof.key
       )
     ) {
       this.object.setAlpha(
@@ -90,8 +91,8 @@ export class Player {
         this.scene.add.sprite(
           this.object.x,
           this.object.y,
-          GAMEPLAY_ATLAS.key,
-          GAMEPLAY_FRAMES.hunter
+          GAMEPLAY_TEXTURES
+            .hunterProof.key
         )
           .setDisplaySize(
             GAMEPLAY_DISPLAY.hunter
@@ -102,6 +103,12 @@ export class Player {
           .setDepth(
             GAMEPLAY_DISPLAY.hunter
               .depth
+          )
+          .setOrigin(
+            GAMEPLAY_DISPLAY.hunter
+              .originX,
+            GAMEPLAY_DISPLAY.hunter
+              .originY
           )
     }
 

@@ -53,6 +53,12 @@ export class HUD {
   private perfectText!:
     Phaser.GameObjects.Text
 
+  private comboStatusText!:
+    Phaser.GameObjects.Text
+
+  private lastComboStep =
+    0
+
   // BOSS UI
 
   private bossNameText!:
@@ -375,7 +381,7 @@ export class HUD {
       this.scene.add
         .text(
           640,
-          550,
+          520,
           'PERFECT',
           {
             fontFamily:
@@ -397,6 +403,24 @@ export class HUD {
         .setVisible(
           false
         )
+
+    this.comboStatusText =
+      this.scene.add
+        .text(
+          640,
+          555,
+          'CHAIN 1/3',
+          {
+            fontFamily:
+              'Arial Black, Arial',
+            fontSize:
+              '14px',
+            color:
+              '#aabbcc',
+          }
+        )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
 
     this.setComboVisible(
       false
@@ -596,9 +620,15 @@ export class HUD {
       visible
     )
 
+    this.comboStatusText.setVisible(
+      visible
+    )
+
     if (
       !visible
     ) {
+      this.lastComboStep =
+        0
       this.perfectText.setVisible(
         false
       )
@@ -618,7 +648,9 @@ export class HUD {
     perfectStart: number,
     perfectEnd: number,
     failed: boolean,
-    perfect: boolean
+    perfect: boolean,
+    queued: boolean,
+    finisherReady: boolean
   ) {
     this.setComboVisible(
       true
@@ -632,12 +664,12 @@ export class HUD {
         this.comboBoxes
       ) {
         box.setFillStyle(
-          0x662222
+          0x222b35
         )
 
         box.setStrokeStyle(
           2,
-          0xff4444
+          0x667788
         )
       }
 
@@ -646,7 +678,7 @@ export class HUD {
         this.comboLabels
       ) {
         label.setColor(
-          '#ff4444'
+          '#778899'
         )
       }
 
@@ -654,8 +686,54 @@ export class HUD {
         false
       )
 
+      this.comboStatusText
+        .setText(
+          'CHAIN RESET'
+        )
+        .setColor(
+          '#8899aa'
+        )
+
       return
     }
+
+    this.comboStatusText
+      .setText(
+        step === 3
+          ? 'CHAIN COMPLETE'
+          : finisherReady
+            ? 'FINISHER READY'
+            : queued
+              ? 'INPUT QUEUED'
+              : `CHAIN ${step}/3`
+      )
+      .setColor(
+        step === 3 ||
+        finisherReady
+          ? '#ffdd55'
+          : queued
+            ? '#66ddff'
+            : '#aabbcc'
+      )
+
+    if (
+      step >
+      this.lastComboStep
+    ) {
+      this.comboStatusText.setScale(
+        step === 3
+          ? 1.2
+          : 1.08
+      )
+      this.scene.tweens.add({
+        targets:
+          this.comboStatusText,
+        scale: 1,
+        duration: 110,
+      })
+    }
+    this.lastComboStep =
+      step
 
     for (
       let i = 0;

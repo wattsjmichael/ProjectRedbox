@@ -13,10 +13,9 @@ import type {
 } from '../progression/DropScalingSystem'
 
 import {
-  GAMEPLAY_ATLAS,
   GAMEPLAY_DISPLAY,
-  GAMEPLAY_FRAMES,
-  hasGameplayArt,
+  GAMEPLAY_TEXTURES,
+  hasGameplayTexture,
 } from '../assets/GameplayArt'
 
 interface EnemyManagerConfig {
@@ -515,15 +514,15 @@ export class EnemyManager {
         ) *
         movement
 
-      this.syncEnemyVisual(
-        enemy
-      )
-
       enemy.y +=
         Math.sin(
           angle
         ) *
         movement
+
+      this.syncEnemyVisual(
+        enemy
+      )
     }
   }
 
@@ -903,36 +902,44 @@ export class EnemyManager {
     type:
       EnemyType
   ) {
+    const texture =
+      type === 'wyrm'
+        ? GAMEPLAY_TEXTURES.wyrm
+        : type === 'elite'
+          ? GAMEPLAY_TEXTURES
+            .enemyElite
+          : GAMEPLAY_TEXTURES
+            .enemyBasicProof
+    const display =
+      type === 'wyrm'
+        ? GAMEPLAY_DISPLAY.enemyBoss
+        : type === 'elite'
+          ? GAMEPLAY_DISPLAY
+            .enemyElite
+          : GAMEPLAY_DISPLAY
+            .enemyStandard
+
     if (
-      !hasGameplayArt(
-        this.scene
+      !hasGameplayTexture(
+        this.scene,
+        texture.key
       )
     ) {
       return null
     }
 
-    const frame =
-      type === 'wyrm'
-        ? GAMEPLAY_FRAMES.wyrm
-        : type === 'elite'
-          ? GAMEPLAY_FRAMES.enemyElite
-          : GAMEPLAY_FRAMES.enemyBasic
-    const display =
-      type === 'wyrm'
-        ? GAMEPLAY_DISPLAY.enemyBoss
-        : type === 'elite'
-          ? GAMEPLAY_DISPLAY.enemyElite
-          : GAMEPLAY_DISPLAY.enemyStandard
-
     return this.scene.add.sprite(
       enemy.x,
       enemy.y,
-      GAMEPLAY_ATLAS.key,
-      frame
+      texture.key
     )
       .setDisplaySize(
         display.width,
         display.height
+      )
+      .setOrigin(
+        display.originX,
+        display.originY
       )
       .setDepth(
         display.depth
