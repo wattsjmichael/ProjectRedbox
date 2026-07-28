@@ -692,7 +692,8 @@ export class GameScene
               state.failed,
               state.perfect,
               state.queued,
-              state.finisherReady
+              state.finisherReady,
+              state.finisherLabel
             )
           },
 

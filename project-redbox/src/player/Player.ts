@@ -110,6 +110,11 @@ export class Player {
             GAMEPLAY_DISPLAY.hunter
               .originY
           )
+
+      this.object.setData(
+        'visual',
+        this.visual
+      )
     }
 
     this.cursors =

@@ -362,12 +362,12 @@ Those come after the persistent progression loop proves itself.
 # Day 29 — Wed 8/12
 ## WELCOME HUNTER
 
-* [ ] First-run tutorial overlays
-* [ ] Hunter Hub onboarding
-* [ ] Equip workflow tutorial
-* [ ] MAG feeding tutorial
-* [ ] Tutorial persistence
-* [ ] Skip tutorial option
+* [x] First-run tutorial overlays
+* [x] Hunter Hub onboarding
+* [x] Equip workflow tutorial
+* [x] MAG feeding tutorial
+* [x] Tutorial persistence
+* [x] Skip tutorial option
 * [ ] Commit — `v0.11.0 - Welcome Hunter`
 
 ---
@@ -375,15 +375,15 @@ Those come after the persistent progression loop proves itself.
 # Day 30 — Thu 8/13
 ## FIRST ART PASS
 
-* [ ] Select a cohesive free sprite pack
-* [ ] Replace Hunter placeholder sprite
-* [ ] Replace enemy placeholder sprites
-* [ ] Add elite visual variants
-* [ ] Replace Wyrm placeholder sprite
-* [ ] Improve projectile sprites
-* [ ] Improve Red Box sprite
-* [ ] Improve loot pickup sprites
-* [ ] Ensure consistent sprite scaling
+* [x] Select a cohesive free sprite pack
+* [x] Replace Hunter placeholder sprite
+* [x] Replace enemy placeholder sprites
+* [x] Add elite visual variants
+* [x] Replace Wyrm placeholder sprite
+* [x] Improve projectile sprites
+* [x] Improve Red Box sprite
+* [x] Improve loot pickup sprites
+* [x] Ensure consistent sprite scaling
 * [ ] Commit — `v0.11.1 - First Art Pass`
 
 ---
@@ -391,25 +391,25 @@ Those come after the persistent progression loop proves itself.
 # Day 31 — Fri 8/14
 ## COMBAT POLISH
 
-* [ ] Tune weapon combo timing
-* [ ] Improve hit-stop
-* [ ] Improve impact feedback
-* [ ] Improve enemy hit reactions
-* [ ] Improve combo UI
-* [ ] Improve weapon feel
-* [ ] Commit — `v0.11.2 - Combat Polish`
+* [x] Tune weapon combo timing
+* [x] Improve hit-stop
+* [x] Improve impact feedback
+* [x] Improve enemy hit reactions
+* [x] Improve combo UI
+* [x] Improve weapon feel
+* [x] Commit — `v0.11.2 - Combat Polish`
 
 ---
 
 # Day 32 — Sat 8/15
 ## WEAPON IDENTITY
 
-* [ ] Rifle finisher identity
-* [ ] Scattergun finisher identity
-* [ ] Cannon finisher identity
-* [ ] Photon Lance finisher identity
-* [ ] Greatsword polish
-* [ ] Balance combo finishers
+* [x] Rifle finisher identity
+* [x] Scattergun finisher identity
+* [x] Cannon finisher identity
+* [x] Photon Lance finisher identity
+* [x] Greatsword polish
+* [x] Balance combo finishers
 * [ ] Commit — `v0.11.3 - Weapon Identity`
 
 ---

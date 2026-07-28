@@ -317,7 +317,12 @@ export class CombatFeedbackManager {
   }
 
   stop() {
-    this.scene.cameras.main.resetFX()
+    const camera =
+      this.scene.cameras?.main
+
+    if (camera) {
+      camera.resetFX()
+    }
   }
 
   destroy() {

@@ -125,6 +125,11 @@ export class HunterBayScene
               this.inventory
                 .getEquippedItem() !==
               null,
+          hasAnyWeapon:
+            () =>
+              this.inventory
+                .getItems()
+                .length > 0,
           hasFeedableItem:
             () =>
               this.inventory

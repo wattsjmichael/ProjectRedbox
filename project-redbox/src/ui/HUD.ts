@@ -650,7 +650,8 @@ export class HUD {
     failed: boolean,
     perfect: boolean,
     queued: boolean,
-    finisherReady: boolean
+    finisherReady: boolean,
+    finisherLabel: string
   ) {
     this.setComboVisible(
       true
@@ -702,7 +703,7 @@ export class HUD {
         step === 3
           ? 'CHAIN COMPLETE'
           : finisherReady
-            ? 'FINISHER READY'
+            ? finisherLabel
             : queued
               ? 'INPUT QUEUED'
               : `CHAIN ${step}/3`

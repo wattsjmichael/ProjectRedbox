@@ -13,6 +13,10 @@ import {
 } from './WeaponComboConfig'
 
 import type {
+  WeaponAttackStyle,
+} from './WeaponComboConfig'
+
+import type {
   CombatFeedbackManager,
 } from '../combat/CombatFeedbackManager'
 
@@ -32,6 +36,7 @@ export interface ComboState {
   perfect: boolean
   queued: boolean
   finisherReady: boolean
+  finisherLabel: string
 }
 
 interface WeaponSystemConfig {
@@ -151,6 +156,60 @@ private getMagEnergyMultiplier:
       Phaser.GameObjects.Rectangle,
       Phaser.Math.Vector2
     >()
+
+  private bulletHitEnemies =
+    new Map<
+      Phaser.GameObjects.Rectangle,
+      Set<
+        Phaser.GameObjects.Rectangle
+      >
+    >()
+
+  private bulletDistance =
+    new Map<
+      Phaser.GameObjects.Rectangle,
+      number
+    >()
+
+  private readonly attackHandlers:
+    Record<
+      WeaponAttackStyle,
+      (
+        step: number,
+        perfect: boolean
+      ) => void
+    > = {
+      precisionProjectile:
+        step =>
+          this.fireRifle(
+            this.getAttackDirection(),
+            step
+          ),
+      spreadProjectile:
+        step =>
+          this.fireScattergun(
+            this.getAttackDirection(),
+            step
+          ),
+      heavyProjectile:
+        step =>
+          this.fireCannon(
+            this.getAttackDirection(),
+            step
+          ),
+      photonProjectile:
+        step =>
+          this.firePhotonLance(
+            this.getAttackDirection(),
+            step
+          ),
+      meleeRhythm:
+        (step, perfect) =>
+          this.performGreatswordComboStep(
+            step,
+            perfect
+          ),
+    }
 
   // Shared three-step attack rhythm.
 
@@ -274,6 +333,8 @@ this.getMagEnergyMultiplier =
       []
 
     this.bulletDirections.clear()
+    this.bulletHitEnemies.clear()
+    this.bulletDistance.clear()
 
     this.currentWeapon =
       'rifle'
@@ -407,8 +468,10 @@ update(
         timing.earliestNextInput,
 
       perfectEnd:
-        this.currentWeapon ===
-          'greatsword'
+        WEAPON_COMBO_TIMINGS[
+          this.currentWeapon
+        ].finisher ===
+          'timedMelee'
           ? Math.min(
             420 /
             this.getSpeedMultiplier(),
@@ -431,6 +494,11 @@ update(
         this.comboStep === 2 &&
         this.comboTimer >=
           timing.earliestNextInput,
+
+      finisherLabel:
+        WEAPON_COMBO_TIMINGS[
+          this.currentWeapon
+        ].finisherLabel,
     })
   }
 
@@ -547,8 +615,10 @@ update(
 
   private advanceCombo() {
     const perfect =
-      this.currentWeapon ===
-        'greatsword' &&
+      WEAPON_COMBO_TIMINGS[
+        this.currentWeapon
+      ].finisher ===
+        'timedMelee' &&
       this.comboTimer >=
         this.getCurrentTiming()
           .earliestNextInput &&
@@ -577,62 +647,43 @@ update(
       perfect,
     })
 
-    switch (
-      this.currentWeapon
-    ) {
-      case 'greatsword':
-        this.performGreatswordComboStep(
-          step,
-          perfect
-        )
-        break
-      default:
-        this.fireAt(
-          this.targetX,
-          this.targetY,
-          step
-        )
-        break
-    }
+    const definition =
+      WEAPON_COMBO_TIMINGS[
+        this.currentWeapon
+      ]
+
+    this.attackHandlers[
+      definition.attackStyle
+    ](
+      step,
+      perfect
+    )
   }
 
   private performGreatswordComboStep(
     step: number,
     perfect: boolean
   ) {
-    switch (step) {
-      case 1:
-        this.performGreatswordSwing(
-          1,
-          95,
-          65,
-          180,
-          false
-        )
-        break
-      case 2:
-        this.performGreatswordSwing(
-          perfect
-            ? 3
-            : 2,
-          115,
-          85,
-          240,
-          perfect
-        )
-        break
-      case 3:
-        this.performGreatswordSwing(
-          perfect
-            ? 6
-            : 4,
-          145,
-          120,
-          400,
-          perfect
-        )
-        break
+    const attack =
+      WEAPON_COMBO_TIMINGS
+        .greatsword.behavior
+        .meleeSteps?.[
+        step - 1
+      ]
+
+    if (!attack) {
+      return
     }
+
+    this.performGreatswordSwing(
+      perfect
+        ? attack.perfectDamage
+        : attack.damage,
+      attack.range,
+      attack.arc,
+      attack.lock,
+      perfect
+    )
   }
 
   private failAndResetCombo(
@@ -929,6 +980,15 @@ update(
       0,
       0.5
     )
+    sword.setStrokeStyle(
+      this.comboStep === 3
+        ? 4
+        : 2,
+      perfect
+        ? 0xffffff
+        : 0xffaaaa,
+      0.9
+    )
 
     const baseAngle =
       direction.angle()
@@ -956,25 +1016,59 @@ update(
           sword.destroy()
         },
     })
+
+    if (
+      this.comboStep === 3 ||
+      perfect
+    ) {
+      const trail =
+        this.scene.add.rectangle(
+          this.player.x,
+          this.player.y,
+          swordLength +
+            24,
+          swordWidth +
+            14,
+          perfect
+            ? 0xffdd55
+            : 0xff3344,
+          0.22
+        )
+          .setOrigin(
+            0,
+            0.5
+          )
+          .setRotation(
+            baseAngle -
+            0.9
+          )
+          .setBlendMode(
+            Phaser.BlendModes.ADD
+          )
+
+      this.scene.tweens.add({
+        targets: trail,
+        rotation:
+          baseAngle +
+          0.9,
+        alpha: 0,
+        scaleY: 1.6,
+        duration:
+          duration +
+          40,
+        onComplete: () =>
+          trail.destroy(),
+      })
+    }
   }
 
-  private fireAt(
-    targetX: number,
-    targetY: number,
-    comboStep: number
-  ) {
-    if (
-      !this.player.active
-    ) {
-      return
-    }
-
+  private getAttackDirection() {
     const direction =
       new Phaser.Math.Vector2(
-        targetX -
+        this.targetX -
         this.player.x,
 
-        targetY -
+        this.targetY -
         this.player.y
       )
 
@@ -982,45 +1076,13 @@ update(
       direction.length() ===
       0
     ) {
-      return
+      direction.set(
+        1,
+        0
+      )
     }
 
-    direction.normalize()
-
-    switch (
-    this.currentWeapon
-    ) {
-      case 'rifle':
-        this.fireRifle(
-          direction,
-          comboStep
-        )
-        break
-
-      case 'scattergun':
-        this.fireScattergun(
-          direction,
-          comboStep
-        )
-        break
-
-      case 'cannon':
-        this.fireCannon(
-          direction,
-          comboStep
-        )
-        break
-
-      case 'photonLance':
-        this.firePhotonLance(
-          direction,
-          comboStep
-        )
-        break
-
-      case 'greatsword':
-        break
-    }
+    return direction.normalize()
   }
 
   private fireRifle(
@@ -1029,6 +1091,9 @@ update(
     comboStep:
       number
   ) {
+    const behavior =
+      WEAPON_COMBO_TIMINGS
+        .rifle.behavior
     const multiplier =
       this.getComboDamageMultiplier(
         comboStep
@@ -1036,7 +1101,8 @@ update(
 
     this.createBullet(
       direction,
-      500,
+      behavior.projectileSpeed ??
+        500,
       comboStep === 3 ? 17 : 12,
       comboStep === 3 ? 6 : 4,
       comboStep === 3
@@ -1044,7 +1110,16 @@ update(
         : 0xffff00,
       multiplier,
       'rifle',
-      comboStep
+      comboStep,
+      comboStep === 3
+        ? {
+          maxHits:
+            behavior
+              .finisherMaxHits,
+          maxRange:
+            behavior.maxRange,
+        }
+        : undefined
     )
 
     this.createMuzzleFlash(
@@ -1052,6 +1127,14 @@ update(
       comboStep,
       0xffff55
     )
+
+    if (comboStep === 3) {
+      this.createTracer(
+        direction,
+        1200,
+        0xaaffff
+      )
+    }
 
     this.feedback.playAttack(
       'rifle',
@@ -1065,17 +1148,18 @@ update(
     comboStep:
       number
   ) {
+    const behavior =
+      WEAPON_COMBO_TIMINGS
+        .scattergun.behavior
     const pelletCount =
-      comboStep === 3
-        ? 7
-        : comboStep === 2
-          ? 6
-          : 5
+      behavior.comboCounts?.[
+        comboStep - 1
+      ] ?? 5
 
     const spread =
-      comboStep === 1
-        ? 0.35
-        : 0.44
+      behavior.comboSpreads?.[
+        comboStep - 1
+      ] ?? 0.35
 
     const multiplier =
       this.getComboDamageMultiplier(
@@ -1099,13 +1183,21 @@ update(
 
       this.createBullet(
         pelletDirection,
-        450,
+        behavior.projectileSpeed ??
+          450,
         8,
         4,
         0xffaa00,
         multiplier,
         'scattergun',
-        comboStep
+        comboStep,
+        comboStep === 3
+          ? {
+            knockback:
+              behavior
+                .finisherKnockback,
+          }
+          : undefined
       )
     }
 
@@ -1114,6 +1206,12 @@ update(
       comboStep,
       0xffaa00
     )
+
+    if (comboStep === 3) {
+      this.playPlayerRecoil(
+        1.14
+      )
+    }
 
     this.feedback.playAttack(
       'scattergun',
@@ -1127,9 +1225,13 @@ update(
     comboStep:
       number
   ) {
+    const behavior =
+      WEAPON_COMBO_TIMINGS
+        .cannon.behavior
     this.createBullet(
       direction,
-      250,
+      behavior.projectileSpeed ??
+        250,
       comboStep === 3 ? 24 : 18,
       comboStep === 3 ? 24 : 18,
       comboStep === 3
@@ -1140,7 +1242,13 @@ update(
         comboStep
       ),
       'cannon',
-      comboStep
+      comboStep,
+      comboStep === 3
+        ? {
+          explode:
+            true,
+        }
+        : undefined
     )
 
     this.createMuzzleFlash(
@@ -1161,209 +1269,45 @@ update(
     comboStep:
       number
   ) {
-    const beamLength =
-      1000
-
-    const beamWidth =
+    const behavior =
+      WEAPON_COMBO_TIMINGS
+        .photonLance.behavior
+    this.createBullet(
+      direction,
+      behavior.projectileSpeed ??
+        720,
       comboStep === 3
-        ? 22
-        : comboStep === 2
-          ? 17
-          : 14
-
-    const baseDamage =
+        ? 28
+        : 22,
+      comboStep === 3
+        ? 10
+        : 8,
+      0x55ffff,
       3 *
       this.getComboDamageMultiplier(
         comboStep
-      )
-
-    const startX =
-      this.player.x
-
-    const startY =
-      this.player.y
-
-    const endX =
-      startX +
-      direction.x *
-      beamLength
-
-    const endY =
-      startY +
-      direction.y *
-      beamLength
-
-    const beam:
-      | Phaser.GameObjects.Sprite
-      | Phaser.GameObjects.Rectangle =
-      hasGameplayTexture(
-        this.scene,
-        GAMEPLAY_TEXTURES
-          .projectilePhoton.key
-      )
-        ? this.scene.add.sprite(
-          startX,
-          startY,
-          GAMEPLAY_TEXTURES
-            .projectilePhoton.key
-        )
-          .setDisplaySize(
-            beamLength,
-            beamWidth
-          )
-          .setDepth(15)
-        : this.scene.add.rectangle(
-          startX,
-          startY,
-          beamLength,
-          beamWidth,
-          comboStep === 3
-            ? 0x88ffff
-            : 0x00ffff,
-          0.9
-        )
-
-    beam.setOrigin(
-      0,
-      0.5
-    )
-
-    beam.setRotation(
-      direction.angle()
-    )
-
-    const beamCore =
-      this.scene.add.rectangle(
-        startX,
-        startY,
-        beamLength,
-        4,
-        0xffffff,
-        1
-      )
-
-    beamCore.setOrigin(
-      0,
-      0.5
-    )
-
-    beamCore.setRotation(
-      direction.angle()
-    )
-
-    const laserLine =
-      new Phaser.Geom.Line(
-        startX,
-        startY,
-        endX,
-        endY
-      )
-
-    const enemies = [
-      ...this.getEnemies(),
-    ]
-
-    for (
-      const enemy of
-      enemies
-    ) {
-      if (
-        !enemy.active
-      ) {
-        continue
-      }
-
-      const hitCircle =
-        new Phaser.Geom.Circle(
-          enemy.x,
-          enemy.y,
-          18
-        )
-
-      const hit =
-        Phaser.Geom.Intersects.LineToCircle(
-          laserLine,
-          hitCircle
-        )
-
-      if (
-        !hit
-      ) {
-        continue
-      }
-
-      const damageResult =
-        this.calculateDamage(
-          baseDamage
-        )
-
-      const currentHealth =
-        this.getEnemyHealth(
-          enemy
-        )
-
-      const newHealth =
-        currentHealth -
-        damageResult.damage
-
-      this.setEnemyHealth(
-        enemy,
-        newHealth
-      )
-      this.onDamageDealt?.(
-        enemy.x,
-        enemy.y,
-        damageResult.damage,
-        damageResult.critical
-      )
-
-      if (
-        damageResult.critical
-      ) {
-        this.triggerCriticalFeedback(
-          enemy.x,
-          enemy.y
-        )
-      }
-
-      this.feedback.playHit(
-        enemy,
-        'photonLance',
-        comboStep,
-        {
-          critical:
-            damageResult.critical,
+      ),
+      'photonLance',
+      comboStep,
+      comboStep === 3
+        ? {
+          maxHits:
+            behavior
+              .finisherMaxHits,
+          chainCount:
+            behavior.chainCount,
         }
-      )
+        : {
+          maxHits:
+            behavior.maxHits,
+        }
+    )
 
-      if (
-        newHealth <=
-        0
-      ) {
-        this.killEnemy(
-          enemy
-        )
-      }
-    }
-
-    this.scene.tweens.add({
-      targets: [
-        beam,
-        beamCore,
-      ],
-
-      alpha:
-        0,
-
-      duration:
-        120,
-
-      onComplete:
-        () => {
-          beam.destroy()
-          beamCore.destroy()
-        },
-    })
+    this.createMuzzleFlash(
+      direction,
+      comboStep,
+      0x66ffff
+    )
 
     this.feedback.playAttack(
       'photonLance',
@@ -1391,10 +1335,21 @@ update(
       number,
 
     weaponType:
-      WeaponType,
+      Exclude<
+        WeaponType,
+        'greatsword'
+      >,
 
     comboStep:
-      number
+      number,
+
+    options: {
+      maxHits?: number
+      maxRange?: number
+      chainCount?: number
+      explode?: boolean
+      knockback?: number
+    } = {}
   ) {
     const bullet =
       this.scene.add.rectangle(
@@ -1405,28 +1360,52 @@ update(
         color
       )
 
+    const projectileVisuals = {
+      rifle: {
+        texture:
+          GAMEPLAY_TEXTURES
+            .projectileRifle,
+        display:
+          GAMEPLAY_DISPLAY
+            .projectileRifle,
+      },
+      scattergun: {
+        texture:
+          GAMEPLAY_TEXTURES
+            .projectileScatter,
+        display:
+          GAMEPLAY_DISPLAY
+            .projectileScatter,
+      },
+      cannon: {
+        texture:
+          GAMEPLAY_TEXTURES
+            .projectileCannon,
+        display:
+          GAMEPLAY_DISPLAY
+            .projectileCannon,
+      },
+      photonLance: {
+        texture:
+          GAMEPLAY_TEXTURES
+            .projectilePhoton,
+        display:
+          GAMEPLAY_DISPLAY
+            .projectilePhoton,
+      },
+    } as const
+    const visualDefinition =
+      projectileVisuals[
+        weaponType
+      ]
     const texture =
-      weaponType === 'rifle'
-        ? GAMEPLAY_TEXTURES
-          .projectileRifle
-        : weaponType ===
-            'scattergun'
-          ? GAMEPLAY_TEXTURES
-            .projectileScatter
-          : GAMEPLAY_TEXTURES
-            .projectileCannon
+      visualDefinition?.texture
     const display =
-      weaponType === 'rifle'
-        ? GAMEPLAY_DISPLAY
-          .projectileRifle
-        : weaponType ===
-            'scattergun'
-          ? GAMEPLAY_DISPLAY
-            .projectileScatter
-          : GAMEPLAY_DISPLAY
-            .projectileCannon
+      visualDefinition?.display
 
     if (
+      texture &&
+      display &&
       hasGameplayTexture(
         this.scene,
         texture.key
@@ -1479,6 +1458,27 @@ update(
       'comboStep',
       comboStep
     )
+    bullet.setData(
+      'maxHits',
+      options.maxHits ?? 1
+    )
+    bullet.setData(
+      'maxRange',
+      options.maxRange ??
+      Number.POSITIVE_INFINITY
+    )
+    bullet.setData(
+      'chainCount',
+      options.chainCount ?? 0
+    )
+    bullet.setData(
+      'explode',
+      options.explode ?? false
+    )
+    bullet.setData(
+      'knockback',
+      options.knockback ?? 0
+    )
 
     this.bullets.push(
       bullet
@@ -1487,6 +1487,14 @@ update(
     this.bulletDirections.set(
       bullet,
       direction
+    )
+    this.bulletHitEnemies.set(
+      bullet,
+      new Set()
+    )
+    this.bulletDistance.set(
+      bullet,
+      0
     )
   }
 
@@ -1541,6 +1549,18 @@ update(
         speed *
         (delta / 1000)
 
+      const totalDistance =
+        (
+          this.bulletDistance.get(
+            bullet
+          ) ?? 0
+        ) +
+        distance
+      this.bulletDistance.set(
+        bullet,
+        totalDistance
+      )
+
       bullet.x +=
         direction.x *
         distance
@@ -1578,6 +1598,12 @@ update(
       }
 
       if (
+        totalDistance >=
+        Number(
+          bullet.getData(
+            'maxRange'
+          )
+        ) ||
         bullet.x < 0 ||
         bullet.x >
         this.worldWidth ||
@@ -1599,13 +1625,23 @@ update(
   ) {
     const enemies =
       this.getEnemies()
+    const hitEnemies =
+      this.bulletHitEnemies.get(
+        bullet
+      ) ??
+      new Set<
+        Phaser.GameObjects.Rectangle
+      >()
 
     for (
       const enemy of
       enemies
     ) {
       if (
-        !enemy.active
+        !enemy.active ||
+        hitEnemies.has(
+          enemy
+        )
       ) {
         continue
       }
@@ -1657,6 +1693,14 @@ update(
         currentHealth -
         damageResult.damage
 
+      hitEnemies.add(
+        enemy
+      )
+      this.bulletHitEnemies.set(
+        bullet,
+        hitEnemies
+      )
+
       this.setEnemyHealth(
         enemy,
         newHealth
@@ -1695,20 +1739,94 @@ update(
         this.killEnemy(
           enemy
         )
+      } else {
+        const knockback =
+          Number(
+            bullet.getData(
+              'knockback'
+            ) ?? 0
+          )
+        const direction =
+          this.bulletDirections.get(
+            bullet
+          )
+
+        if (
+          knockback > 0 &&
+          direction
+        ) {
+          const lastKnockback =
+            Number(
+              enemy.getData(
+                'lastWeaponKnockbackAt'
+              ) ??
+              -Infinity
+            )
+
+          if (
+            this.scene.time.now -
+            lastKnockback >
+            80
+          ) {
+            const resistance =
+              enemy.getData(
+                'enemyType'
+              ) === 'wyrm'
+                ? 0.2
+                : 1
+            enemy.x +=
+              direction.x *
+              knockback *
+              resistance
+            enemy.y +=
+              direction.y *
+              knockback *
+              resistance
+            enemy.setData(
+              'lastWeaponKnockbackAt',
+              this.scene.time.now
+            )
+          }
+        }
       }
 
       if (
-        weaponType ===
-        'cannon'
+        bullet.getData(
+          'explode'
+        ) === true
       ) {
         this.createCannonExplosion(
           impactX,
           impactY,
+          comboStep,
+          enemy
+        )
+      }
+
+      const chainCount =
+        Number(
+          bullet.getData(
+            'chainCount'
+          ) ?? 0
+        )
+
+      if (chainCount > 0) {
+        this.createPhotonChain(
+          enemy,
+          chainCount,
+          baseDamage,
           comboStep
         )
       }
 
-      return true
+      return (
+        hitEnemies.size >=
+        Number(
+          bullet.getData(
+            'maxHits'
+          ) ?? 1
+        )
+      )
     }
 
     return false
@@ -1717,12 +1835,15 @@ update(
   private createCannonExplosion(
     x: number,
     y: number,
-    comboStep: number
+    comboStep: number,
+    directHit:
+      Phaser.GameObjects.Rectangle
   ) {
     const radius =
-      comboStep === 3
-        ? 105
-        : 80
+      WEAPON_COMBO_TIMINGS
+        .cannon.behavior
+        .explosionRadius ??
+      105
 
     const explosion =
       this.scene.add.circle(
@@ -1761,7 +1882,8 @@ update(
       enemies
     ) {
       if (
-        !enemy.active
+        !enemy.active ||
+        enemy === directHit
       ) {
         continue
       }
@@ -1809,6 +1931,16 @@ update(
         newHealth
       )
 
+      this.feedback.playHit(
+        enemy,
+        'cannon',
+        comboStep,
+        {
+          critical:
+            damageResult.critical,
+        }
+      )
+
       if (
         damageResult.critical
       ) {
@@ -1827,6 +1959,180 @@ update(
         )
       }
     }
+  }
+
+  private createPhotonChain(
+    firstTarget:
+      Phaser.GameObjects.Rectangle,
+    chainCount: number,
+    baseDamage: number,
+    comboStep: number
+  ) {
+    const visited =
+      new Set<
+        Phaser.GameObjects.Rectangle
+      >([
+        firstTarget,
+      ])
+    let sourceX =
+      firstTarget.x
+    let sourceY =
+      firstTarget.y
+
+    for (
+      let link = 0;
+      link < chainCount;
+      link++
+    ) {
+      const next =
+        this.getEnemies()
+          .filter(
+            enemy =>
+              enemy.active &&
+              !visited.has(
+                enemy
+              ) &&
+              Phaser.Math.Distance.Between(
+                sourceX,
+                sourceY,
+                enemy.x,
+                enemy.y
+              ) <=
+              (
+                WEAPON_COMBO_TIMINGS
+                  .photonLance
+                  .behavior
+                  .chainRange ??
+                230
+              )
+          )
+          .sort(
+            (left, right) =>
+              Phaser.Math.Distance.Between(
+                sourceX,
+                sourceY,
+                left.x,
+                left.y
+              ) -
+              Phaser.Math.Distance.Between(
+                sourceX,
+                sourceY,
+                right.x,
+                right.y
+              )
+          )[0]
+
+      if (!next) {
+        break
+      }
+
+      visited.add(
+        next
+      )
+      this.createPhotonArc(
+        sourceX,
+        sourceY,
+        next.x,
+        next.y
+      )
+
+      const damageResult =
+        this.calculateDamage(
+          baseDamage *
+          0.82
+        )
+      const newHealth =
+        this.getEnemyHealth(
+          next
+        ) -
+        damageResult.damage
+
+      this.setEnemyHealth(
+        next,
+        newHealth
+      )
+      this.onDamageDealt?.(
+        next.x,
+        next.y,
+        damageResult.damage,
+        damageResult.critical
+      )
+      if (
+        damageResult.critical
+      ) {
+        this.triggerCriticalFeedback(
+          next.x,
+          next.y
+        )
+      }
+      this.feedback.playHit(
+        next,
+        'photonLance',
+        comboStep,
+        {
+          critical:
+            damageResult.critical,
+        }
+      )
+
+      sourceX =
+        next.x
+      sourceY =
+        next.y
+
+      if (newHealth <= 0) {
+        this.killEnemy(
+          next
+        )
+      }
+    }
+
+    this.scene.events.emit(
+      'combat-audio:photon-chain',
+      visited.size - 1
+    )
+  }
+
+  private createPhotonArc(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number
+  ) {
+    const arc =
+      this.scene.add.graphics()
+        .setDepth(19)
+
+    arc.lineStyle(
+      5,
+      0x33ddff,
+      0.45
+    )
+    arc.lineBetween(
+      fromX,
+      fromY,
+      toX,
+      toY
+    )
+    arc.lineStyle(
+      2,
+      0xffffff,
+      0.95
+    )
+    arc.lineBetween(
+      fromX,
+      fromY,
+      toX,
+      toY
+    )
+
+    this.scene.tweens.add({
+      targets: arc,
+      alpha: 0,
+      duration: 150,
+      onComplete: () =>
+        arc.destroy(),
+    })
   }
 
 private calculateDamage(
@@ -1963,6 +2269,12 @@ private calculateDamage(
     this.bulletDirections.delete(
       bullet
     )
+    this.bulletHitEnemies.delete(
+      bullet
+    )
+    this.bulletDistance.delete(
+      bullet
+    )
 
     if (
       this.bullets[index] ===
@@ -2056,6 +2368,91 @@ private calculateDamage(
         () => {
           flash.destroy()
         },
+    })
+
+  }
+
+  private createTracer(
+    direction:
+      Phaser.Math.Vector2,
+    length: number,
+    color: number
+  ) {
+    const tracer =
+      this.scene.add.graphics()
+        .setDepth(14)
+    const startX =
+      this.player.x +
+      direction.x * 24
+    const startY =
+      this.player.y +
+      direction.y * 24
+
+    tracer.lineStyle(
+      3,
+      color,
+      0.72
+    )
+    tracer.lineBetween(
+      startX,
+      startY,
+      startX +
+      direction.x *
+      length,
+      startY +
+      direction.y *
+      length
+    )
+
+    this.scene.tweens.add({
+      targets: tracer,
+      alpha: 0,
+      duration: 90,
+      onComplete: () =>
+        tracer.destroy(),
+    })
+  }
+
+  private playPlayerRecoil(
+    strength: number
+  ) {
+    const visual =
+      this.player.getData(
+        'visual'
+      ) as
+        | Phaser.GameObjects.Sprite
+        | undefined
+
+    if (!visual?.active) {
+      return
+    }
+
+    this.scene.tweens.killTweensOf(
+      visual
+    )
+    const scaleX =
+      visual.scaleX
+    const scaleY =
+      visual.scaleY
+
+    this.scene.tweens.add({
+      targets: visual,
+      scaleX:
+        scaleX *
+        strength,
+      scaleY:
+        scaleY /
+        strength,
+      duration: 55,
+      yoyo: true,
+      onComplete: () => {
+        if (visual.active) {
+          visual.setScale(
+            scaleX,
+            scaleY
+          )
+        }
+      },
     })
   }
 }

@@ -9,6 +9,7 @@ interface HunterHubTutorialConfig {
   scene: Phaser.Scene
   state: TutorialSaveState
   hasEquippedWeapon: () => boolean
+  hasAnyWeapon: () => boolean
   hasFeedableItem: () => boolean
   onStateChanged: () => void
 }
@@ -28,6 +29,11 @@ export class HunterHubTutorial {
   private readonly hasFeedableItem:
     HunterHubTutorialConfig[
       'hasFeedableItem'
+    ]
+
+  private readonly hasAnyWeapon:
+    HunterHubTutorialConfig[
+      'hasAnyWeapon'
     ]
 
   private readonly onStateChanged:
@@ -52,6 +58,8 @@ export class HunterHubTutorial {
       config.state
     this.hasEquippedWeapon =
       config.hasEquippedWeapon
+    this.hasAnyWeapon =
+      config.hasAnyWeapon
     this.hasFeedableItem =
       config.hasFeedableItem
     this.onStateChanged =
@@ -249,7 +257,9 @@ export class HunterHubTutorial {
 
     this.createInstructionPanel(
       'EQUIP A WEAPON',
-      'Select a weapon from your inventory and equip it before beginning your drop.'
+      this.hasAnyWeapon()
+        ? 'Select a weapon from your inventory and equip it before beginning your drop.'
+        : 'No weapons have been recovered yet. Your first drop includes a field-issue Rifle; recovered weapons will become persistent inventory.'
     )
 
     if (
@@ -261,6 +271,23 @@ export class HunterHubTutorial {
           192,
           260,
           'USE EQUIPPED WEAPON',
+          () => {
+            this.advanceTo(
+              'feed'
+            )
+          }
+        )
+
+      this.add(button)
+    } else if (
+      !this.hasAnyWeapon()
+    ) {
+      const button =
+        this.createButton(
+          930,
+          192,
+          260,
+          'CONTINUE TO MAG',
           () => {
             this.advanceTo(
               'feed'

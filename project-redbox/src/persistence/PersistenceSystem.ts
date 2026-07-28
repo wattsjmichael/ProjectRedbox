@@ -119,7 +119,7 @@ export class PersistenceSystem {
           parsed
         )
       ) {
-        return this.clone({
+        return this.removeTestWeapons({
           inventory:
             parsed.inventory,
           equippedWeapon:
@@ -140,7 +140,7 @@ export class PersistenceSystem {
           parsed
         )
       ) {
-        return this.clone({
+        return this.removeTestWeapons({
           inventory:
             parsed.inventory,
           equippedWeapon:
@@ -163,7 +163,9 @@ export class PersistenceSystem {
         return null
       }
 
-      return this.clone(parsed)
+      return this.removeTestWeapons(
+        parsed
+      )
     } catch (error) {
       console.warn(
         'Could not load Project Redbox save; using fresh data.',
@@ -194,119 +196,15 @@ export class PersistenceSystem {
 
   createFreshSave():
     PersistentGameData {
-    const starterRifle:
-      WeaponItem = {
-      id:
-        'starter-rifle',
-      category:
-        'weapon',
-      weaponType:
-        'rifle',
-      rarity:
-        'common',
-      name:
-        'Standard Rifle',
-      attack:
-        10,
-      speed:
-        1.2,
-      criticalChance:
-        0.08,
-      criticalDamage:
-        1.5,
-    }
-
     const inventory:
-      WeaponItem[] = [
-      {
-        id:
-          'test-greatsword-1',
-        category:
-          'weapon',
-        weaponType:
-          'greatsword',
-        rarity:
-          'rare',
-        name:
-          'Prototype Greatsword',
-        attack:
-          28,
-        speed:
-          0.85,
-        criticalChance:
-          0.18,
-        criticalDamage:
-          2,
-      },
-      {
-        id:
-          'test-scattergun-1',
-        category:
-          'weapon',
-        weaponType:
-          'scattergun',
-        rarity:
-          'uncommon',
-        name:
-          'Enhanced Scattergun',
-        attack:
-          16,
-        speed:
-          1.15,
-        criticalChance:
-          0.12,
-        criticalDamage:
-          1.6,
-      },
-      {
-        id:
-          'test-cannon-1',
-        category:
-          'weapon',
-        weaponType:
-          'cannon',
-        rarity:
-          'rare',
-        name:
-          'Prototype Cannon',
-        attack:
-          25,
-        speed:
-          0.75,
-        criticalChance:
-          0.08,
-        criticalDamage:
-          2.25,
-      },
-      {
-        id:
-          'test-rifle-1',
-        category:
-          'weapon',
-        weaponType:
-          'rifle',
-        rarity:
-          'uncommon',
-        name:
-          'Enhanced Rifle',
-        attack:
-          15,
-        speed:
-          1.4,
-        criticalChance:
-          0.2,
-        criticalDamage:
-          1.75,
-      },
-      starterRifle,
-    ]
+      WeaponItem[] = []
     const player =
       createDefaultPlayerStats()
 
     return {
       inventory,
       equippedWeapon:
-        starterRifle,
+        null,
       mag:
         createStarterMag(),
       player: {
@@ -440,6 +338,40 @@ export class PersistenceSystem {
       value.version === 1 &&
       this.hasValidCoreData(value)
     )
+  }
+
+  private removeTestWeapons(
+    data:
+      PersistentGameData
+  ) {
+    const testWeaponIds =
+      new Set([
+        'starter-rifle',
+        'test-greatsword-1',
+        'test-scattergun-1',
+        'test-cannon-1',
+        'test-rifle-1',
+      ])
+    const inventory =
+      data.inventory.filter(
+        item =>
+          !testWeaponIds.has(
+            item.id
+          )
+      )
+    const equippedWeapon =
+      data.equippedWeapon &&
+      !testWeaponIds.has(
+        data.equippedWeapon.id
+      )
+        ? data.equippedWeapon
+        : null
+
+    return this.clone({
+      ...data,
+      inventory,
+      equippedWeapon,
+    })
   }
 
   private hasValidCoreData(

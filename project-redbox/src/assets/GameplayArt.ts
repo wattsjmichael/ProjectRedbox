@@ -123,6 +123,14 @@ export const GAMEPLAY_DISPLAY = {
     depth:
       15,
   },
+  projectilePhoton: {
+    width:
+      28,
+    height:
+      8,
+    depth:
+      15,
+  },
   projectileScatter: {
     width:
       12,
