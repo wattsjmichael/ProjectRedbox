@@ -1,4 +1,14 @@
-export interface MagStats {
+export const CoreStage = {
+  Dormant: 'dormant',
+  Awakened: 'awakened',
+} as const
+
+export type CoreStage =
+  typeof CoreStage[
+    keyof typeof CoreStage
+  ]
+
+export interface CoreStats {
   power:
     number
 
@@ -12,7 +22,7 @@ export interface MagStats {
     number
 }
 
-export interface MagData {
+export interface CoreData {
   id:
     string
 
@@ -26,14 +36,17 @@ export interface MagData {
     number
 
   stats:
-    MagStats
+    CoreStats
+
+  stage:
+    CoreStage
 }
 
-export function createStarterMag():
-  MagData {
+export function createStarterCore():
+  CoreData {
   return {
     id:
-      'starter-mag',
+      'starter-core',
 
     name:
       'RB-01',
@@ -43,6 +56,9 @@ export function createStarterMag():
 
     experience:
       0,
+
+    stage:
+      CoreStage.Dormant,
 
     stats: {
       power:

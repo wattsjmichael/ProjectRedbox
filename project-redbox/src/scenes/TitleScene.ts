@@ -209,7 +209,7 @@ export class TitleScene
 
         const confirmed =
           window.confirm(
-            'Reset Hunter? This permanently deletes all inventory, MAG progress, equipment, and lifetime stats.'
+            'Reset Hunter? This permanently deletes all inventory, Core progress, equipment, and lifetime stats.'
           )
 
         if (!confirmed) {

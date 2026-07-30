@@ -9,8 +9,16 @@ import {
 } from '../inventory/InventorySystem'
 
 import {
-  MagSystem,
-} from '../mag/MagSystem'
+  ItemGenerator,
+} from '../items/ItemGenerator'
+
+import {
+  CoreSystem,
+} from '../core/CoreSystem'
+
+import {
+  CoreVisual,
+} from '../core/CoreVisual'
 
 import {
   PersistenceSystem,
@@ -39,8 +47,15 @@ export class HunterBayScene
   private inventory!:
     InventorySystem
 
-  private mag!:
-    MagSystem
+  private core!:
+    CoreSystem
+
+  private coreVisual:
+    CoreVisual | null =
+    null
+
+  private feedInProgress =
+    false
 
   private summary:
     RunSummary | null = null
@@ -100,15 +115,16 @@ export class HunterBayScene
       saveData.inventory,
       saveData.equippedWeapon
     )
-    this.mag =
-      new MagSystem(
-        saveData.mag
+    this.core =
+      new CoreSystem(
+        saveData.core
       )
 
     this.selectedItem =
       this.getInitialSelection()
 
     this.render()
+    this.setupCoreDebugControl()
 
     if (
       !this.saveData.tutorial
@@ -153,6 +169,9 @@ export class HunterBayScene
     this.events.once(
       Phaser.Scenes.Events.SHUTDOWN,
       () => {
+        this.coreVisual?.destroy()
+        this.coreVisual =
+          null
         this.tutorial?.destroy()
         this.tutorial =
           null
@@ -178,6 +197,9 @@ export class HunterBayScene
   }
 
   private render() {
+    this.coreVisual?.destroy()
+    this.coreVisual =
+      null
     this.children.removeAll()
     this.cameras.main.setBackgroundColor(
       '#07090d'
@@ -230,10 +252,26 @@ export class HunterBayScene
   private createHeader() {
     const account =
       this.saveData.account
-    const mag =
-      this.mag.getMag()
+    const core =
+      this.core.getCore()
     const lifetime =
       account.lifetimeStats
+
+    this.coreVisual =
+      new CoreVisual({
+        scene:
+          this,
+        x:
+          880,
+        y:
+          62,
+        mode:
+          'interface',
+        awakened:
+          this.core
+            .getNextEvolution() ===
+          null,
+      })
 
     this.add.text(
       36,
@@ -266,7 +304,7 @@ export class HunterBayScene
     this.add.text(
       405,
       20,
-      `MAG ${mag.name}  LV ${mag.level}`,
+      `CORE ${core.name} // ${this.core.getStageDefinition().displayName.toUpperCase()} // LV ${core.level}`,
       {
         fontFamily:
           'Arial Black, Arial',
@@ -279,8 +317,8 @@ export class HunterBayScene
 
     this.add.text(
       405,
-      53,
-      `PWR ${mag.stats.power}   DEF ${mag.stats.defense}   DEX ${mag.stats.dexterity}   ENG ${mag.stats.energy}`,
+      47,
+      `PWR ${core.stats.power}   DEF ${core.stats.defense}   DEX ${core.stats.dexterity}   ENG ${core.stats.energy}`,
       {
         fontFamily:
           'Arial',
@@ -291,12 +329,79 @@ export class HunterBayScene
       }
     )
 
+    const xpNeeded =
+      this.core.getExperienceNeeded()
+    const progressWidth =
+      460
+    const progress =
+      Phaser.Math.Clamp(
+        core.experience /
+          xpNeeded,
+        0,
+        1
+      )
+
+    this.add.text(
+      405,
+      68,
+      `PROGRESS ${core.experience} / ${xpNeeded}`,
+      {
+        fontFamily:
+          'Arial',
+        fontSize:
+          '10px',
+        color:
+          '#999999',
+      }
+    )
+    this.add.rectangle(
+      405,
+      83,
+      progressWidth,
+      7,
+      0x303743
+    )
+      .setOrigin(
+        0,
+        0.5
+      )
+    this.add.rectangle(
+      405,
+      83,
+      progressWidth *
+        progress,
+      7,
+      0xe50914
+    )
+      .setOrigin(
+        0,
+        0.5
+      )
+
+    const next =
+      this.core.getNextEvolution()
+    this.add.text(
+      405,
+      90,
+      next
+        ? `NEXT EVOLUTION // ${next.displayName.toUpperCase()} // LEVEL ${next.requiredLevel} REQUIRED`
+        : `EVOLUTION BONUS // ${this.core.getStageDefinition().bonus.displayName.toUpperCase()} // ${this.core.getStageDefinition().bonus.description.toUpperCase()}`,
+      {
+        fontFamily:
+          'Arial',
+        fontSize:
+          '10px',
+        color:
+          '#ff9999',
+      }
+    )
+
     const equipped =
       this.inventory.getEquippedItem()
 
     this.add.text(
-      405,
-      78,
+      38,
+      90,
       `EQUIPPED // ${equipped?.name ?? 'NONE'}`,
       {
         fontFamily:
@@ -305,6 +410,20 @@ export class HunterBayScene
           '13px',
         color:
           '#888888',
+      }
+    )
+
+    this.add.text(
+      405,
+      106,
+      'Autonomous support module // develops by processing salvaged equipment',
+      {
+        fontFamily:
+          'Arial',
+        fontSize:
+          '10px',
+        color:
+          '#777777',
       }
     )
 
@@ -878,23 +997,57 @@ export class HunterBayScene
       1075,
       514,
       260,
-      'FEED TO MAG',
+      'FEED CORE',
       0x3d1717,
       () => {
+        if (
+          this.feedInProgress
+        ) {
+          return
+        }
+
+        this.feedInProgress =
+          true
+
         if (
           !this.inventory.removeItem(
             item.id
           )
         ) {
+          this.feedInProgress =
+            false
           return
         }
 
         const result =
-          this.mag.feedWeapon(
+          this.core.feedWeapon(
             item
           )
         this.statusMessage =
-          `${item.name.toUpperCase()} FED // +${result.experienceGained} XP // +${result.statGained} ${result.statName.toUpperCase()} // MAG LV ${result.newLevel}`
+          `CORE FED // ${item.name.toUpperCase()} // +${result.statGained} ${result.statName.toUpperCase()} // +${result.experienceGained} PROGRESS`
+
+        if (
+          result.leveledUp
+        ) {
+          this.statusMessage +=
+            ` // CORE LEVEL UP ${result.newLevel}`
+        }
+
+        if (
+          result.evolved
+        ) {
+          const definition =
+            this.core
+              .getStageDefinition()
+          this.statusMessage =
+            `CORE EVOLVED // ${definition.displayName.toUpperCase()} // ${definition.bonus.displayName.toUpperCase()} ACTIVATED // ${definition.bonus.description.toUpperCase()}`
+          this.cameras.main.flash(
+            450,
+            255,
+            60,
+            60
+          )
+        }
         this.selectedItem =
           this.inventory
             .getEquippedItem() ??
@@ -903,10 +1056,51 @@ export class HunterBayScene
           null
         this.save()
         this.tutorial
-          ?.onMagFed()
+          ?.onCoreFed()
         this.render()
+
+        if (
+          result.evolved
+        ) {
+          this.coreVisual
+            ?.playEvolution()
+        } else {
+          this.coreVisual
+            ?.playFeedPulse()
+        }
+
+        this.time.delayedCall(
+          result.evolved
+            ? 1800
+            : 250,
+          () => {
+            this.feedInProgress =
+              false
+          }
+        )
       }
     )
+
+    const preview =
+      this.core.previewFeed(
+        item
+      )
+    this.add.text(
+      1075,
+      472,
+      `FEED PREVIEW // ${preview.statName.toUpperCase()} +${preview.statGained} // PROGRESS +${preview.experienceGained}`,
+      {
+        fontFamily:
+          'Arial',
+        fontSize:
+          '12px',
+        color:
+          '#cc9966',
+      }
+    )
+      .setOrigin(
+        0.5
+      )
   }
 
   private createStatusMessage() {
@@ -1007,6 +1201,80 @@ export class HunterBayScene
     )
   }
 
+  private setupCoreDebugControl() {
+    if (
+      !import.meta.env.DEV ||
+      !this.input.keyboard
+    ) {
+      return
+    }
+
+    const handler =
+      (
+        event:
+          KeyboardEvent
+      ) => {
+        if (
+          event.code !==
+            'KeyC' ||
+          !event.shiftKey ||
+          !event.ctrlKey
+        ) {
+          return
+        }
+
+        this.core
+          .prepareEvolutionTest()
+
+        const hasFeedableItem =
+          this.inventory
+            .getItems()
+            .some(
+              item =>
+                !this.inventory
+                  .isEquipped(
+                    item.id
+                  )
+            )
+
+        if (!hasFeedableItem) {
+          const debugItem =
+            ItemGenerator
+              .generateWeapon(
+                'rifle'
+              )
+          debugItem.id =
+            `core-evolution-debug-${Date.now()}`
+          debugItem.name =
+            'CORE TEST SALVAGE'
+          debugItem.rarity =
+            'common'
+          this.inventory.addItem(
+            debugItem
+          )
+        }
+
+        this.statusMessage =
+          'DEV CTRL+SHIFT+C // CORE SET TO LEVEL 9 // FEED ONE COMMON ITEM TO EVOLVE'
+        this.save()
+        this.render()
+      }
+
+    this.input.keyboard.on(
+      'keydown',
+      handler
+    )
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        this.input.keyboard?.off(
+          'keydown',
+          handler
+        )
+      }
+    )
+  }
+
   private createActionButton(
     x: number,
     y: number,
@@ -1061,8 +1329,8 @@ export class HunterBayScene
       this.inventory.getItems()
     this.saveData.equippedWeapon =
       this.inventory.getEquippedItem()
-    this.saveData.mag =
-      this.mag.getMag()
+    this.saveData.core =
+      this.core.getCore()
 
     this.persistence.save(
       this.saveData

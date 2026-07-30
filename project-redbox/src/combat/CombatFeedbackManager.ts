@@ -164,7 +164,7 @@ export class CombatFeedbackManager {
       (
         enemy.getData(
           'enemyType'
-        ) ?? 'normal'
+        ) ?? 'basic'
       ) as EnemyType
     const finisher =
       comboStep === 3
@@ -175,6 +175,8 @@ export class CombatFeedbackManager {
     const resistance =
       type === 'wyrm'
         ? 0.5
+        : type === 'tank'
+          ? 0.62
         : type === 'elite'
           ? 0.72
           : 1
@@ -415,9 +417,11 @@ export class CombatFeedbackManager {
     const baseScaleY =
       storedScale.y
     const resistance =
-      type === 'elite'
+      type === 'tank'
+        ? 0.45
+        : type === 'elite'
           ? 0.6
-            : 1
+          : 1
     const punch =
       (
         heavy

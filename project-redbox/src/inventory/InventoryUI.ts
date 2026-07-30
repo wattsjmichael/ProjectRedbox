@@ -10,8 +10,12 @@ import {
 } from './InventorySystem'
 
 import {
-  MagSystem,
-} from '../mag/MagSystem'
+  CoreSystem,
+} from '../core/CoreSystem'
+
+import {
+  CoreVisual,
+} from '../core/CoreVisual'
 
 interface InventoryUIConfig {
   scene:
@@ -20,8 +24,8 @@ interface InventoryUIConfig {
   inventory:
     InventorySystem
 
-  mag:
-    MagSystem
+  core:
+    CoreSystem
 
   getHunterStats:
     () => {
@@ -61,8 +65,12 @@ export class InventoryUI {
   private inventory:
     InventorySystem
 
-  private mag:
-    MagSystem
+  private core:
+    CoreSystem
+
+  private coreVisual:
+    CoreVisual | null =
+    null
 
   private getHunterStats:
     InventoryUIConfig['getHunterStats']
@@ -102,8 +110,8 @@ export class InventoryUI {
     this.inventory =
       config.inventory
 
-    this.mag =
-      config.mag
+    this.core =
+      config.core
 
     this.getHunterStats =
       config.getHunterStats
@@ -216,13 +224,16 @@ export class InventoryUI {
   }
 
   private rebuild() {
+    this.coreVisual?.destroy()
+    this.coreVisual =
+      null
     this.container.removeAll(
       true
     )
 
     this.createBackground()
 
-    this.createMagPanel()
+    this.createCorePanel()
 
     this.createHunterStatsPanel()
 
@@ -342,21 +353,37 @@ export class InventoryUI {
     ])
   }
 
-  private createMagPanel() {
-    const mag =
-      this.mag.getMag()
+  private createCorePanel() {
+    const core =
+      this.core.getCore()
 
     const xpNeeded =
-      this.mag
+      this.core
         .getExperienceNeeded()
 
-    const magBackground =
+    this.coreVisual =
+      new CoreVisual({
+        scene:
+          this.scene,
+        x:
+          475,
+        y:
+          105,
+        mode:
+          'interface',
+        awakened:
+          this.core
+            .getNextEvolution() ===
+          null,
+      })
+
+    const coreBackground =
       this.scene.add
         .rectangle(
           290,
           145,
           400,
-          70,
+          112,
           0x181818,
           0.95
         )
@@ -365,12 +392,12 @@ export class InventoryUI {
           0x444444
         )
 
-    const magTitle =
+    const coreTitle =
       this.scene.add
         .text(
           105,
           125,
-          `MAG // ${mag.name}`,
+          `CORE // ${core.name}`,
           {
             fontFamily:
               'Arial Black, Arial',
@@ -383,12 +410,12 @@ export class InventoryUI {
           }
         )
 
-    const magLevel =
+    const coreLevel =
       this.scene.add
         .text(
           455,
           125,
-          `LV ${mag.level}`,
+          `${this.core.getStageDefinition().displayName.toUpperCase()} // LV ${core.level}`,
           {
             fontFamily:
               'Arial Black, Arial',
@@ -405,16 +432,16 @@ export class InventoryUI {
           0
         )
 
-    const magStats =
+    const coreStats =
       this.scene.add
         .text(
           105,
-          153,
+          151,
           [
-            `PWR ${mag.stats.power}`,
-            `DEF ${mag.stats.defense}`,
-            `DEX ${mag.stats.dexterity}`,
-            `ENG ${mag.stats.energy}`,
+            `PWR ${core.stats.power}`,
+            `DEF ${core.stats.defense}`,
+            `DEX ${core.stats.dexterity}`,
+            `ENG ${core.stats.energy}`,
           ].join(
             '     '
           ),
@@ -430,12 +457,12 @@ export class InventoryUI {
           }
         )
 
-    const magExperience =
+    const coreExperience =
       this.scene.add
         .text(
           455,
-          153,
-          `XP ${mag.experience} / ${xpNeeded}`,
+          151,
+          `PROGRESS ${core.experience} / ${xpNeeded}`,
           {
             fontFamily:
               'Arial',
@@ -452,12 +479,66 @@ export class InventoryUI {
           0
         )
 
+    const progressWidth =
+      350
+    const levelProgress =
+      Phaser.Math.Clamp(
+        core.experience /
+          xpNeeded,
+        0,
+        1
+      )
+    const progressBackground =
+      this.scene.add.rectangle(
+        280,
+        178,
+        progressWidth,
+        8,
+        0x303743
+      )
+    const progressFill =
+      this.scene.add.rectangle(
+        105,
+        178,
+        progressWidth *
+          levelProgress,
+        8,
+        0xe50914
+      )
+        .setOrigin(
+          0,
+          0.5
+        )
+    const next =
+      this.core.getNextEvolution()
+    const milestone =
+      this.scene.add.text(
+        105,
+        187,
+        next
+          ? `NEXT EVOLUTION // ${next.displayName.toUpperCase()} // LEVEL ${next.requiredLevel}`
+          : `EVOLUTION BONUS // ${this.core.getStageDefinition().bonus.displayName.toUpperCase()} // ${this.core.getStageDefinition().bonus.description.toUpperCase()}`,
+        {
+          fontFamily:
+            'Arial',
+          fontSize:
+            '10px',
+          color:
+            '#ff9b9b',
+        }
+      )
+
     this.container.add([
-      magBackground,
-      magTitle,
-      magLevel,
-      magStats,
-      magExperience,
+      coreBackground,
+      ...this.coreVisual
+        .getObjects(),
+      coreTitle,
+      coreLevel,
+      coreStats,
+      coreExperience,
+      progressBackground,
+      progressFill,
+      milestone,
     ])
   }
 
@@ -1206,7 +1287,7 @@ export class InventoryUI {
         .text(
           850,
           640,
-          'FEED TO MAG',
+          'FEED CORE',
           {
             fontFamily:
               'Arial Black, Arial',
@@ -1218,6 +1299,28 @@ export class InventoryUI {
               '#ff4444',
           }
         )
+        .setOrigin(
+          0.5
+        )
+
+    const preview =
+      this.core.previewFeed(
+        item
+      )
+    const feedPreview =
+      this.scene.add.text(
+        850,
+        608,
+        `FEED PREVIEW // ${preview.statName.toUpperCase()} +${preview.statGained} // PROGRESS +${preview.experienceGained}`,
+        {
+          fontFamily:
+            'Arial',
+          fontSize:
+            '12px',
+          color:
+            '#cc9966',
+        }
+      )
         .setOrigin(
           0.5
         )
@@ -1243,6 +1346,10 @@ export class InventoryUI {
     feedButton.on(
       'pointerdown',
       () => {
+        const previousStage =
+          this.core
+            .getCore()
+            .stage
         const fed =
           this.onFeed(
             item
@@ -1288,13 +1395,38 @@ export class InventoryUI {
           items[0] ??
           null
 
-        this.rebuild()
+        const evolved =
+          previousStage !==
+          this.core
+            .getCore()
+            .stage
+
+        if (evolved) {
+          this.coreVisual
+            ?.playEvolution()
+        } else {
+          this.coreVisual
+            ?.playFeedPulse()
+        }
+
+        this.scene.time
+          .delayedCall(
+            evolved
+              ? 700
+              : 180,
+            () => {
+              if (this.visible) {
+                this.rebuild()
+              }
+            }
+          )
       }
     )
 
     this.container.add([
       equipButton,
       equipText,
+      feedPreview,
       feedButton,
       feedText,
     ])

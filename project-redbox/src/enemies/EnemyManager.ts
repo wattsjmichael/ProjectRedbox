@@ -1,10 +1,13 @@
 import Phaser from 'phaser'
 
 import type {
+  EnemyState,
   EnemyType,
 } from './EnemyTypes'
 
 import {
+  EnemyType as EnemyTypes,
+  ENEMY_BEHAVIORS,
   ENEMY_STATS,
 } from './EnemyTypes'
 
@@ -137,7 +140,7 @@ export class EnemyManager {
     return (
       this.enemyTypes.get(
         enemy
-      ) ?? 'normal'
+      ) ?? EnemyTypes.Basic
     )
   }
 
@@ -146,7 +149,7 @@ export class EnemyManager {
       EnemyType
   ) {
     const multiplier =
-      type === 'wyrm'
+      type === EnemyTypes.Wyrm
         ? this.scaling
           .wyrmHealthMultiplier
         : this.scaling
@@ -173,7 +176,7 @@ export class EnemyManager {
   spawnAt(
     x: number,
     y: number,
-    type: EnemyType = 'normal'
+    type: EnemyType = EnemyTypes.Basic
   ) {
     const stats =
       ENEMY_STATS[
@@ -209,6 +212,36 @@ export class EnemyManager {
       'enemyType',
       type
     )
+    enemy.setData(
+      'behaviorState',
+      type === EnemyTypes.Wyrm
+        ? 'pursue'
+        : 'spawn'
+    )
+    enemy.setData(
+      'stateTimer',
+      type === EnemyTypes.Wyrm
+        ? 0
+        : 260
+    )
+    enemy.setData(
+      'velocityX',
+      0
+    )
+    enemy.setData(
+      'velocityY',
+      0
+    )
+    enemy.setData(
+      'strafeDirection',
+      Math.random() < 0.5
+        ? -1
+        : 1
+    )
+    enemy.setData(
+      'attackDamageActive',
+      false
+    )
 
     this.enemyHealth.set(
       enemy,
@@ -228,7 +261,7 @@ export class EnemyManager {
 
     if (
       type ===
-      'elite'
+      EnemyTypes.Elite
     ) {
       this.createEliteEffect(
         enemy,
@@ -238,7 +271,7 @@ export class EnemyManager {
 
     if (
       type ===
-      'wyrm'
+      EnemyTypes.Wyrm
     ) {
       this.createWyrmEffect(
         enemy,
@@ -270,7 +303,7 @@ export class EnemyManager {
     return this.spawnAt(
       x,
       y,
-      'wyrm'
+      EnemyTypes.Wyrm
     )
   }
 
@@ -463,11 +496,6 @@ export class EnemyManager {
           enemy
         )
 
-      const stats =
-        ENEMY_STATS[
-          type
-        ]
-
       const distanceToPlayer =
         Phaser.Math.Distance.Between(
           enemy.x,
@@ -480,7 +508,7 @@ export class EnemyManager {
       // Regular enemies have limited aggro range.
       if (
         type !==
-          'wyrm' &&
+          EnemyTypes.Wyrm &&
         distanceToPlayer >
           this.chaseDistance
       ) {
@@ -490,40 +518,605 @@ export class EnemyManager {
       // Wyrm pauses while telegraphing slam.
       if (
         type ===
-          'wyrm' &&
+          EnemyTypes.Wyrm &&
         this.wyrmSlamInProgress
       ) {
         continue
       }
 
-      const angle =
-        Phaser.Math.Angle.Between(
-          enemy.x,
-          enemy.y,
+      if (
+        type ===
+        EnemyTypes.Wyrm
+      ) {
+        this.moveToward(
+          enemy,
           this.player.x,
-          this.player.y
+          this.player.y,
+          ENEMY_STATS[type].speed,
+          delta,
+          1
         )
-
-      const movement =
-        stats.speed *
-        (delta / 1000)
-
-      enemy.x +=
-        Math.cos(
-          angle
-        ) *
-        movement
-
-      enemy.y +=
-        Math.sin(
-          angle
-        ) *
-        movement
+      } else {
+        this.updateRegularEnemy(
+          enemy,
+          type,
+          distanceToPlayer,
+          delta
+        )
+      }
 
       this.syncEnemyVisual(
         enemy
       )
     }
+  }
+
+  private updateRegularEnemy(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType,
+    distanceToPlayer:
+      number,
+    delta:
+      number
+  ) {
+    const config =
+      ENEMY_BEHAVIORS[type]
+    const state =
+      (
+        enemy.getData(
+          'behaviorState'
+        ) ?? 'spawn'
+      ) as EnemyState
+    const timer =
+      Math.max(
+        0,
+        Number(
+          enemy.getData(
+            'stateTimer'
+          ) ?? 0
+        ) - delta
+      )
+
+    enemy.setData(
+      'stateTimer',
+      timer
+    )
+
+    if (state === 'spawn') {
+      if (timer <= 0) {
+        this.setEnemyState(
+          enemy,
+          'pursue'
+        )
+      }
+      return
+    }
+
+    if (state === 'telegraph') {
+      if (timer <= 0) {
+        this.beginEnemyAttack(
+          enemy,
+          type
+        )
+      }
+      return
+    }
+
+    if (state === 'attack') {
+      this.updateEnemyAttack(
+        enemy,
+        type,
+        delta
+      )
+
+      if (
+        Number(
+          enemy.getData(
+            'stateTimer'
+          )
+        ) <= 0
+      ) {
+        this.finishEnemyAttack(
+          enemy,
+          type
+        )
+      }
+      return
+    }
+
+    if (state === 'recover') {
+      this.dampenVelocity(
+        enemy,
+        delta,
+        type === EnemyTypes.Fast
+          ? 8
+          : 12
+      )
+
+      if (timer <= 0) {
+        this.setEnemyState(
+          enemy,
+          'pursue',
+          config.reengagementDelay
+        )
+      }
+      return
+    }
+
+    if (
+      timer > 0 &&
+      state === 'pursue'
+    ) {
+      this.dampenVelocity(
+        enemy,
+        delta,
+        5
+      )
+      return
+    }
+
+    if (
+      distanceToPlayer <=
+      config.attackRange
+    ) {
+      this.startEnemyTelegraph(
+        enemy,
+        type
+      )
+      return
+    }
+
+    if (
+      type === EnemyTypes.Fast
+    ) {
+      this.moveFastEnemy(
+        enemy,
+        delta
+      )
+      return
+    }
+
+    if (
+      type === EnemyTypes.Tank &&
+      distanceToPlayer <
+        config.preferredRange *
+        0.72
+    ) {
+      const awayAngle =
+        Phaser.Math.Angle.Between(
+          this.player.x,
+          this.player.y,
+          enemy.x,
+          enemy.y
+        )
+      this.moveToward(
+        enemy,
+        enemy.x +
+          Math.cos(awayAngle) *
+          80,
+        enemy.y +
+          Math.sin(awayAngle) *
+          80,
+        ENEMY_STATS[type].speed *
+          0.65,
+        delta,
+        config.turnResponsiveness
+      )
+      return
+    }
+
+    this.moveToward(
+      enemy,
+      this.player.x,
+      this.player.y,
+      ENEMY_STATS[type].speed,
+      delta,
+      config.turnResponsiveness
+    )
+  }
+
+  private moveFastEnemy(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    delta:
+      number
+  ) {
+    const side =
+      Number(
+        enemy.getData(
+          'strafeDirection'
+        ) ?? 1
+      )
+    const playerAngle =
+      Phaser.Math.Angle.Between(
+        enemy.x,
+        enemy.y,
+        this.player.x,
+        this.player.y
+      )
+    const flankAngle =
+      playerAngle +
+      side * 0.82
+    const targetX =
+      this.player.x -
+      Math.cos(flankAngle) *
+      ENEMY_BEHAVIORS.fast
+        .preferredRange
+    const targetY =
+      this.player.y -
+      Math.sin(flankAngle) *
+      ENEMY_BEHAVIORS.fast
+        .preferredRange
+
+    this.moveToward(
+      enemy,
+      targetX,
+      targetY,
+      ENEMY_STATS.fast.speed,
+      delta,
+      ENEMY_BEHAVIORS.fast
+        .turnResponsiveness
+    )
+  }
+
+  private startEnemyTelegraph(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType
+  ) {
+    const config =
+      ENEMY_BEHAVIORS[type]
+    const angle =
+      Phaser.Math.Angle.Between(
+        enemy.x,
+        enemy.y,
+        this.player.x,
+        this.player.y
+      )
+
+    enemy.setData(
+      'attackAngle',
+      angle
+    )
+    this.setEnemyState(
+      enemy,
+      'telegraph',
+      config.attackWindup
+    )
+    this.dampenVelocity(
+      enemy,
+      1000,
+      20
+    )
+
+    const radius =
+      type === EnemyTypes.Tank
+        ? config.attackRange
+        : Math.max(
+          18,
+          ENEMY_STATS[type].size *
+            0.7
+        )
+    const marker =
+      this.scene.add.circle(
+        enemy.x,
+        enemy.y,
+        radius,
+        type === EnemyTypes.Tank
+          ? 0xff5522
+          : 0xffaa44,
+        type === EnemyTypes.Tank
+          ? 0.1
+          : 0.18
+      )
+        .setStrokeStyle(
+          type === EnemyTypes.Tank
+            ? 3
+            : 2,
+          type === EnemyTypes.Tank
+            ? 0xff7744
+            : 0xffcc66,
+          0.85
+        )
+        .setDepth(8)
+
+    marker.setScale(
+      0.35
+    )
+    enemy.setData(
+      'attackTelegraph',
+      marker
+    )
+    this.scene.tweens.add({
+      targets: marker,
+      scale: 1,
+      alpha:
+        type === EnemyTypes.Tank
+          ? 0.32
+          : 0.5,
+      duration:
+        config.attackWindup,
+      ease: 'Quad.Out',
+    })
+  }
+
+  private beginEnemyAttack(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType
+  ) {
+    this.destroyAttackTelegraph(
+      enemy
+    )
+    this.setEnemyState(
+      enemy,
+      'attack',
+      ENEMY_BEHAVIORS[type]
+        .attackDuration
+    )
+    enemy.setData(
+      'attackDamageActive',
+      type !== EnemyTypes.Tank
+    )
+
+    if (type === EnemyTypes.Fast) {
+      const angle =
+        Number(
+          enemy.getData(
+            'attackAngle'
+          ) ?? 0
+        )
+      enemy.setData(
+        'velocityX',
+        Math.cos(angle) * 430
+      )
+      enemy.setData(
+        'velocityY',
+        Math.sin(angle) * 430
+      )
+    }
+
+    if (type === EnemyTypes.Tank) {
+      this.performTankSlam(
+        enemy
+      )
+    }
+  }
+
+  private updateEnemyAttack(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType,
+    delta:
+      number
+  ) {
+    if (type === EnemyTypes.Fast) {
+      enemy.x +=
+        Number(
+          enemy.getData(
+            'velocityX'
+          ) ?? 0
+        ) *
+        delta /
+        1000
+      enemy.y +=
+        Number(
+          enemy.getData(
+            'velocityY'
+          ) ?? 0
+        ) *
+        delta /
+        1000
+      return
+    }
+
+    if (
+      type === EnemyTypes.Basic ||
+      type === EnemyTypes.Elite
+    ) {
+      this.moveToward(
+        enemy,
+        this.player.x,
+        this.player.y,
+        ENEMY_STATS[type].speed *
+          0.75,
+        delta,
+        1
+      )
+    }
+  }
+
+  private finishEnemyAttack(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    type:
+      EnemyType
+  ) {
+    enemy.setData(
+      'attackDamageActive',
+      false
+    )
+    this.setEnemyState(
+      enemy,
+      'recover',
+      ENEMY_BEHAVIORS[type]
+        .recoveryDuration
+    )
+  }
+
+  private performTankSlam(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    const radius =
+      ENEMY_BEHAVIORS.tank
+        .attackRange
+    const impact =
+      this.scene.add.circle(
+        enemy.x,
+        enemy.y,
+        radius,
+        0xff6633,
+        0.36
+      )
+        .setStrokeStyle(
+          4,
+          0xffaa55,
+          0.9
+        )
+        .setDepth(9)
+
+    this.scene.tweens.add({
+      targets: impact,
+      scale: 1.18,
+      alpha: 0,
+      duration: 260,
+      onComplete: () =>
+        impact.destroy(),
+    })
+
+    if (
+      Phaser.Math.Distance.Between(
+        enemy.x,
+        enemy.y,
+        this.player.x,
+        this.player.y
+      ) <= radius
+    ) {
+      this.damagePlayerFrom(
+        EnemyTypes.Tank
+      )
+    }
+  }
+
+  private moveToward(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    targetX:
+      number,
+    targetY:
+      number,
+    speed:
+      number,
+    delta:
+      number,
+    turnResponsiveness:
+      number
+  ) {
+    const angle =
+      Phaser.Math.Angle.Between(
+        enemy.x,
+        enemy.y,
+        targetX,
+        targetY
+      )
+    const desiredX =
+      Math.cos(angle) *
+      speed
+    const desiredY =
+      Math.sin(angle) *
+      speed
+    const blend =
+      Phaser.Math.Clamp(
+        turnResponsiveness *
+        delta /
+        16.67,
+        0,
+        1
+      )
+    const velocityX =
+      Phaser.Math.Linear(
+        Number(
+          enemy.getData(
+            'velocityX'
+          ) ?? 0
+        ),
+        desiredX,
+        blend
+      )
+    const velocityY =
+      Phaser.Math.Linear(
+        Number(
+          enemy.getData(
+            'velocityY'
+          ) ?? 0
+        ),
+        desiredY,
+        blend
+      )
+
+    enemy.setData(
+      'velocityX',
+      velocityX
+    )
+    enemy.setData(
+      'velocityY',
+      velocityY
+    )
+    enemy.x +=
+      velocityX *
+      delta /
+      1000
+    enemy.y +=
+      velocityY *
+      delta /
+      1000
+  }
+
+  private dampenVelocity(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    delta:
+      number,
+    strength:
+      number
+  ) {
+    const factor =
+      Math.max(
+        0,
+        1 -
+        strength *
+        delta /
+        1000
+      )
+    enemy.setData(
+      'velocityX',
+      Number(
+        enemy.getData(
+          'velocityX'
+        ) ?? 0
+      ) * factor
+    )
+    enemy.setData(
+      'velocityY',
+      Number(
+        enemy.getData(
+          'velocityY'
+        ) ?? 0
+      ) * factor
+    )
+  }
+
+  private setEnemyState(
+    enemy:
+      Phaser.GameObjects.Rectangle,
+    state:
+      EnemyState,
+    duration = 0
+  ) {
+    enemy.setData(
+      'behaviorState',
+      state
+    )
+    enemy.setData(
+      'stateTimer',
+      duration
+    )
   }
 
   private updateWyrm(
@@ -781,27 +1374,55 @@ export class EnemyManager {
           enemy
         )
 
-      const damage =
-        ENEMY_STATS[
-          type
-        ].contactDamage *
-        (
-          type === 'wyrm'
-            ? this.scaling
-              .wyrmDamageMultiplier
-            : this.scaling
-              .enemyDamageMultiplier
-        )
+      if (
+        type !== EnemyTypes.Wyrm &&
+        enemy.getData(
+          'attackDamageActive'
+        ) !== true
+      ) {
+        continue
+      }
 
-      this.onPlayerDamage(
-        damage
+      this.damagePlayerFrom(
+        type
       )
-
-      this.playerDamageCooldown =
-        this.damageCooldown
+      enemy.setData(
+        'attackDamageActive',
+        false
+      )
 
       break
     }
+  }
+
+  private damagePlayerFrom(
+    type:
+      EnemyType
+  ) {
+    if (
+      this.playerDamageCooldown >
+      0
+    ) {
+      return
+    }
+
+    const damage =
+      ENEMY_STATS[
+        type
+      ].contactDamage *
+      (
+        type === EnemyTypes.Wyrm
+          ? this.scaling
+            .wyrmDamageMultiplier
+          : this.scaling
+            .enemyDamageMultiplier
+      )
+
+    this.onPlayerDamage(
+      damage
+    )
+    this.playerDamageCooldown =
+      this.damageCooldown
   }
 
   removeEnemy(
@@ -838,7 +1459,7 @@ export class EnemyManager {
 
     if (
       type ===
-      'wyrm'
+      EnemyTypes.Wyrm
     ) {
       this.wyrm =
         null
@@ -903,17 +1524,17 @@ export class EnemyManager {
       EnemyType
   ) {
     const texture =
-      type === 'wyrm'
+      type === EnemyTypes.Wyrm
         ? GAMEPLAY_TEXTURES.wyrm
-        : type === 'elite'
+        : type === EnemyTypes.Elite
           ? GAMEPLAY_TEXTURES
             .enemyElite
           : GAMEPLAY_TEXTURES
             .enemyBasicProof
     const display =
-      type === 'wyrm'
+      type === EnemyTypes.Wyrm
         ? GAMEPLAY_DISPLAY.enemyBoss
-        : type === 'elite'
+        : type === EnemyTypes.Elite
           ? GAMEPLAY_DISPLAY
             .enemyElite
           : GAMEPLAY_DISPLAY
@@ -928,7 +1549,8 @@ export class EnemyManager {
       return null
     }
 
-    return this.scene.add.sprite(
+    const visual =
+      this.scene.add.sprite(
       enemy.x,
       enemy.y,
       texture.key
@@ -944,6 +1566,30 @@ export class EnemyManager {
       .setDepth(
         display.depth
       )
+
+    if (
+      type === EnemyTypes.Fast
+    ) {
+      visual.setDisplaySize(
+        52,
+        36
+      )
+      visual.setTint(
+        0xffaa77
+      )
+    } else if (
+      type === EnemyTypes.Tank
+    ) {
+      visual.setDisplaySize(
+        88,
+        67
+      )
+      visual.setTint(
+        0xaa7755
+      )
+    }
+
+    return visual
   }
 
   private syncEnemyVisual(
@@ -992,6 +1638,18 @@ export class EnemyManager {
       enemy.x,
       enemy.y
     )
+
+    const telegraph =
+      enemy.getData(
+        'attackTelegraph'
+      ) as
+        | Phaser.GameObjects.Arc
+        | undefined
+
+    telegraph?.setPosition(
+      enemy.x,
+      enemy.y
+    )
   }
 
   private destroyEnemyVisual(
@@ -1018,5 +1676,33 @@ export class EnemyManager {
     if (aura?.active) {
       aura.destroy()
     }
+
+    this.destroyAttackTelegraph(
+      enemy
+    )
+  }
+
+  private destroyAttackTelegraph(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    const marker =
+      enemy.getData(
+        'attackTelegraph'
+      ) as
+        | Phaser.GameObjects.Arc
+        | undefined
+
+    if (marker?.active) {
+      this.scene.tweens.killTweensOf(
+        marker
+      )
+      marker.destroy()
+    }
+
+    enemy.setData(
+      'attackTelegraph',
+      undefined
+    )
   }
 }

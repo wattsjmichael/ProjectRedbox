@@ -64,6 +64,12 @@ export const GAMEPLAY_TEXTURES = {
     path:
       'assets/sprites/temp-ai/loot/red_box_temp_v1_gameplay.png',
   },
+  coreDormant: {
+    key:
+      'core-dormant-candidate-v1',
+    path:
+      'assets/sprites/temp-ai/core/core_dormant_candidate_v1.png',
+  },
 } as const
 
 export const GAMEPLAY_DISPLAY = {
@@ -162,6 +168,22 @@ export const GAMEPLAY_DISPLAY = {
       44,
     depth:
       9,
+  },
+  coreFollower: {
+    width:
+      24,
+    height:
+      29,
+    depth:
+      19,
+  },
+  coreInterface: {
+    width:
+      42,
+    height:
+      50,
+    depth:
+      100,
   },
 } as const
 

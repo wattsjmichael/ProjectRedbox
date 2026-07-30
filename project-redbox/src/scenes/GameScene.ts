@@ -49,6 +49,16 @@ import {
 } from '../encounters/EncounterManager'
 
 import {
+  ENCOUNTER_COMPOSITIONS,
+  getCompositionCost,
+} from '../encounters/EncounterCompositions'
+
+import {
+  EnemyType,
+  ENEMY_BEHAVIORS,
+} from '../enemies/EnemyTypes'
+
+import {
   HUD,
 } from '../ui/HUD'
 
@@ -65,8 +75,12 @@ import {
 } from '../inventory/InventoryUI'
 
 import {
-  MagSystem,
-} from '../mag/MagSystem'
+  CoreSystem,
+} from '../core/CoreSystem'
+
+import {
+  CoreVisual,
+} from '../core/CoreVisual'
 
 import {
   createDefaultAccount,
@@ -110,6 +124,9 @@ export class GameScene
   private encounterManager!:
     EncounterManager
 
+  private lastEliteEncounterIndex =
+    -10
+
   private hud!:
     HUD
 
@@ -146,8 +163,15 @@ export class GameScene
   private inventoryUI!:
     InventoryUI
 
-  private magSystem!:
-    MagSystem
+  private coreSystem!:
+    CoreSystem
+
+  private coreVisual:
+    CoreVisual | null =
+    null
+
+  private coreFeedInProgress =
+    false
 
   private inventoryOpen =
     false
@@ -198,7 +222,7 @@ export class GameScene
 
     this.runScaling =
       DropScalingSystem.calculate(
-        this.loadedSave?.mag ??
+        this.loadedSave?.core ??
         null,
         this.loadedSave
           ?.equippedWeapon ??
@@ -229,7 +253,9 @@ export class GameScene
 
     this.createInventorySystem()
 
-    this.createMagSystem()
+    this.createCoreSystem()
+
+    this.createCoreVisual()
 
     this.createInventoryUI()
 
@@ -246,11 +272,42 @@ export class GameScene
 
     this.savePersistentState()
   }
-  private createMagSystem() {
-    this.magSystem =
-      new MagSystem(
-        this.loadedSave?.mag
+  private createCoreSystem() {
+    this.coreSystem =
+      new CoreSystem(
+        this.loadedSave?.core
       )
+  }
+
+  private createCoreVisual() {
+    const hunter =
+      this.player.getObject()
+
+    this.coreVisual?.destroy()
+    this.coreVisual =
+      new CoreVisual({
+        scene:
+          this,
+        x:
+          hunter.x - 34,
+        y:
+          hunter.y + 30,
+        mode:
+          'follower',
+        awakened:
+          this.coreSystem
+            .getNextEvolution() ===
+          null,
+      })
+
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        this.coreVisual?.destroy()
+        this.coreVisual =
+          null
+      }
+    )
   }
 
   private createInventorySystem() {
@@ -289,27 +346,27 @@ export class GameScene
         inventory:
           this.inventorySystem,
 
-        mag:
-          this.magSystem,
+        core:
+          this.coreSystem,
 
         getHunterStats:
           () => {
             return {
               attackBonus:
-                this.magSystem
+                this.coreSystem
                   .getAttackMultiplier() -
                 1,
 
               criticalChanceBonus:
-                this.magSystem
+                this.coreSystem
                   .getCriticalChanceBonus(),
 
               defenseReduction:
-                this.magSystem
+                this.coreSystem
                   .getDefenseReduction(),
 
               energyBonus:
-                this.magSystem
+                this.coreSystem
                   .getEnergyMultiplier() -
                 1,
             }
@@ -328,7 +385,7 @@ export class GameScene
           (
             item
           ) => {
-            return this.feedItemToMag(
+            return this.feedItemToCore(
               item
             )
           },
@@ -340,10 +397,16 @@ export class GameScene
       })
   }
 
-  private feedItemToMag(
+  private feedItemToCore(
     item:
       WeaponItem
   ) {
+    if (
+      this.coreFeedInProgress
+    ) {
+      return false
+    }
+
     if (
       this.inventorySystem.isEquipped(
         item.id
@@ -356,6 +419,9 @@ export class GameScene
       return false
     }
 
+    this.coreFeedInProgress =
+      true
+
     const removed =
       this.inventorySystem.removeItem(
         item.id
@@ -364,11 +430,13 @@ export class GameScene
     if (
       !removed
     ) {
+      this.coreFeedInProgress =
+        false
       return false
     }
 
     const result =
-      this.magSystem.feedWeapon(
+      this.coreSystem.feedWeapon(
         item
       )
 
@@ -379,19 +447,51 @@ export class GameScene
         .toUpperCase()
 
     let message =
-      `${item.name.toUpperCase()} FED TO RB-01\n` +
+      `CORE FED // ${item.name.toUpperCase()}\n` +
       `+${result.statGained} ${statName}\n` +
-      `+${result.experienceGained} XP`
+      `+${result.experienceGained} PROGRESS`
 
     if (
       result.leveledUp
     ) {
       message +=
-        `\nMAG LEVEL ${result.newLevel}`
+        `\nCORE LEVEL ${result.newLevel}`
+    }
+
+    if (
+      result.evolved
+    ) {
+      const definition =
+        this.coreSystem
+          .getStageDefinition()
+      message =
+        `CORE EVOLVED\n${definition.displayName.toUpperCase()}\n` +
+        `${definition.bonus.displayName.toUpperCase()} // ${definition.bonus.description.toUpperCase()}`
+      this.cameras.main.flash(
+        450,
+        255,
+        60,
+        60
+      )
+      this.coreVisual
+        ?.playEvolution()
+    } else {
+      this.coreVisual
+        ?.playFeedPulse()
     }
 
     this.hud.showLootMessage(
       message
+    )
+
+    this.time.delayedCall(
+      result.evolved
+        ? 1800
+        : 250,
+      () => {
+        this.coreFeedInProgress =
+          false
+      }
     )
 
     return true
@@ -440,6 +540,9 @@ export class GameScene
     this.wyrmSpawned =
       false
 
+    this.lastEliteEncounterIndex =
+      -10
+
     this.awaitingBossReward =
       false
 
@@ -450,6 +553,9 @@ export class GameScene
       0
 
     this.runFinalized =
+      false
+
+    this.coreFeedInProgress =
       false
   }
 
@@ -632,28 +738,28 @@ export class GameScene
               )
             }
           },
-        getMagAttackMultiplier:
+        getCoreAttackMultiplier:
           () => {
             return (
-              this.magSystem
+              this.coreSystem
                 ?.getAttackMultiplier() ??
               1
             )
           },
 
-        getMagCriticalChanceBonus:
+        getCoreCriticalChanceBonus:
           () => {
             return (
-              this.magSystem
+              this.coreSystem
                 ?.getCriticalChanceBonus() ??
               0
             )
           },
 
-        getMagEnergyMultiplier:
+        getCoreEnergyMultiplier:
           () => {
             return (
-              this.magSystem
+              this.coreSystem
                 ?.getEnergyMultiplier() ??
               1
             )
@@ -824,6 +930,11 @@ export class GameScene
               item
             )
           },
+
+        getPickupRadiusMultiplier:
+          () =>
+            this.coreSystem
+              .getPickupRadiusMultiplier(),
       })
   }
 
@@ -1034,6 +1145,15 @@ export class GameScene
       delta
     )
 
+    const hunter =
+      this.player.getObject()
+    this.coreVisual
+      ?.updateFollower(
+        delta,
+        hunter.x,
+        hunter.y
+      )
+
     this.encounterManager.update()
 
     this.enemyManager.update(
@@ -1071,74 +1191,131 @@ export class GameScene
     zone:
       EncounterZone
   ) {
-    this.hud.showEncounterMessage(
-      'HOSTILES DETECTED'
-    )
-
     const spawned:
       Phaser.GameObjects.Rectangle[] = []
-
-    let eliteCount =
-      1
-
-    if (
-      zone.enemyCount >=
-      12
-    ) {
-      eliteCount =
+    const encounterIndex =
+      zone.enemyCount <= 8
+        ? 0
+        : zone.enemyCount <= 10
+          ? 1
+          : zone.enemyCount <= 12
+            ? 2
+            : zone.enemyCount <= 14
+              ? 3
+              : 4
+    const budget =
+      6 +
+      encounterIndex * 2
+    const eliteAllowed =
+      encounterIndex >= 3 &&
+      encounterIndex -
+        this.lastEliteEncounterIndex >=
         2
-    }
+    const eligible =
+      ENCOUNTER_COMPOSITIONS.filter(
+        composition =>
+          encounterIndex >=
+            composition.minimumZone &&
+          (
+            composition.maximumZone ===
+              undefined ||
+            encounterIndex <=
+              composition.maximumZone
+          ) &&
+          (
+            eliteAllowed ||
+            !composition.spawns.some(
+              spawn =>
+                spawn.type ===
+                EnemyType.Elite
+            )
+          ) &&
+          getCompositionCost(
+            composition
+          ) <= budget
+      )
+    const weighted =
+      eligible.flatMap(
+        composition =>
+          Array.from(
+            {
+              length:
+                composition.weight,
+            },
+            () => composition
+          )
+      )
+    const composition =
+      weighted[
+        Phaser.Math.Between(
+          0,
+          Math.max(
+            0,
+            weighted.length - 1
+          )
+        )
+      ] ??
+      ENCOUNTER_COMPOSITIONS[0]
 
     if (
-      zone.enemyCount >=
-      16
+      composition.spawns.some(
+        spawn =>
+          spawn.type ===
+          EnemyType.Elite
+      )
     ) {
-      eliteCount =
-        3
+      this.lastEliteEncounterIndex =
+        encounterIndex
     }
 
-    const normalCount =
-      Math.max(
-        0,
-        zone.enemyCount -
-        eliteCount
+    this.hud.showEncounterMessage(
+      composition.name.toUpperCase()
+    )
+
+    let spent =
+      getCompositionCost(
+        composition
       )
+    const spawnPlan = [
+      ...composition.spawns,
+    ]
+
+    while (
+      spent +
+        ENEMY_BEHAVIORS.basic
+          .spawnCost <=
+      budget
+    ) {
+      spawnPlan.push({
+        type: EnemyType.Basic,
+      })
+      spent +=
+        ENEMY_BEHAVIORS.basic
+          .spawnCost
+    }
 
     for (
-      let i = 0;
-      i < normalCount;
-      i++
+      const planned of
+        spawnPlan
     ) {
       const position =
         this.getEncounterSpawnPosition(
-          zone
+          zone,
+          planned.angleOffset
         )
 
       spawned.push(
         this.enemyManager.spawnAt(
           position.x,
           position.y,
-          'normal'
+          planned.type
         )
       )
     }
 
-    for (
-      let i = 0;
-      i < eliteCount;
-      i++
-    ) {
-      const position =
-        this.getEncounterSpawnPosition(
-          zone
-        )
-
-      spawned.push(
-        this.enemyManager.spawnAt(
-          position.x,
-          position.y,
-          'elite'
-        )
+    if (import.meta.env.DEV) {
+      console.debug(
+        `[Encounter] ${composition.name} | phase ${encounterIndex + 1} | budget ${spent}/${budget}`
       )
     }
 
@@ -1147,34 +1324,117 @@ export class GameScene
 
   private getEncounterSpawnPosition(
     zone:
-      EncounterZone
+      EncounterZone,
+    angleOffset = 0
   ) {
-    const angle =
-      Phaser.Math.FloatBetween(
-        0,
-        Math.PI * 2
-      )
+    const minimumSafeDistance =
+      260
+    const existing =
+      this.enemyManager.getEnemies()
 
-    const distance =
-      Phaser.Math.Between(
-        100,
-        zone.radius
-      )
+    for (
+      let attempt = 0;
+      attempt < 12;
+      attempt++
+    ) {
+      const playerAngle =
+        Phaser.Math.Angle.Between(
+          this.player.getObject().x,
+          this.player.getObject().y,
+          zone.x,
+          zone.y
+        )
+      const angle =
+        playerAngle +
+        angleOffset +
+        Phaser.Math.FloatBetween(
+          -0.8,
+          0.8
+        )
+      const distance =
+        Phaser.Math.Between(
+          Math.max(
+            150,
+            Math.round(
+              zone.radius * 0.7
+            )
+          ),
+          Math.max(
+            180,
+            zone.radius
+          )
+        )
+      const candidate = {
+        x:
+          Phaser.Math.Clamp(
+            zone.x +
+              Math.cos(angle) *
+              distance,
+            48,
+            this.worldWidth - 48
+          ),
+        y:
+          Phaser.Math.Clamp(
+            zone.y +
+              Math.sin(angle) *
+              distance,
+            48,
+            this.worldHeight - 48
+          ),
+      }
+      const safeFromPlayer =
+        Phaser.Math.Distance.Between(
+          candidate.x,
+          candidate.y,
+          this.player.getObject().x,
+          this.player.getObject().y
+        ) >= minimumSafeDistance
+      const separated =
+        existing.every(
+          enemy =>
+            !enemy.active ||
+            Phaser.Math.Distance.Between(
+              candidate.x,
+              candidate.y,
+              enemy.x,
+              enemy.y
+            ) >= 64
+        )
+
+      if (
+        safeFromPlayer &&
+        separated
+      ) {
+        return candidate
+      }
+    }
+
+    const fallbackAngle =
+      Phaser.Math.Angle.Between(
+        this.player.getObject().x,
+        this.player.getObject().y,
+        zone.x,
+        zone.y
+      ) +
+      angleOffset
 
     return {
       x:
-        zone.x +
-        Math.cos(
-          angle
-        ) *
-        distance,
-
+        Phaser.Math.Clamp(
+          this.player.getObject().x +
+            Math.cos(fallbackAngle) *
+            minimumSafeDistance,
+          48,
+          this.worldWidth - 48
+        ),
       y:
-        zone.y +
-        Math.sin(
-          angle
-        ) *
-        distance,
+        Phaser.Math.Clamp(
+          this.player.getObject().y +
+            Math.sin(fallbackAngle) *
+            minimumSafeDistance,
+          48,
+          this.worldHeight - 48
+        ),
     }
   }
 
@@ -1277,7 +1537,7 @@ export class GameScene
     }
 
     const defenseReduction =
-      this.magSystem
+      this.coreSystem
         ?.getDefenseReduction() ??
       0
 
@@ -1345,6 +1605,10 @@ export class GameScene
     this.input.keyboard?.resetKeys()
 
     this.player.destroy()
+
+    this.coreVisual?.destroy()
+    this.coreVisual =
+      null
 
     this.hud.showGameOver(
       this.killCount,
@@ -1440,6 +1704,12 @@ export class GameScene
       enemyType ===
         'elite'
         ? 3
+        : enemyType ===
+          'tank'
+          ? 3
+          : enemyType ===
+            'fast'
+            ? 2
         : enemyType ===
           'wyrm'
           ? 20
@@ -1612,7 +1882,7 @@ export class GameScene
   private savePersistentState() {
     if (
       !this.inventorySystem ||
-      !this.magSystem
+      !this.coreSystem
     ) {
       return
     }
@@ -1624,8 +1894,8 @@ export class GameScene
       equippedWeapon:
         this.inventorySystem
           .getEquippedItem(),
-      mag:
-        this.magSystem.getMag(),
+      core:
+        this.coreSystem.getCore(),
       player: {
         ...(
           this.loadedSave?.player ??

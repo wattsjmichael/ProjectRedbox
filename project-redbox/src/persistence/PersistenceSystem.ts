@@ -1,6 +1,11 @@
 import type { WeaponItem } from '../items/ItemTypes'
-import type { MagData } from '../mag/MagTypes'
-import { createStarterMag } from '../mag/MagTypes'
+import type {
+  CoreData,
+} from '../core/CoreTypes'
+import {
+  CoreStage,
+  createStarterCore,
+} from '../core/CoreTypes'
 import { createDefaultPlayerStats } from '../player/PlayerStats'
 
 export interface PersistentPlayerProgression {
@@ -28,7 +33,7 @@ export interface AccountProgression {
 export interface PersistentGameData {
   inventory: WeaponItem[]
   equippedWeapon: WeaponItem | null
-  mag: MagData
+  core: CoreData
   player: PersistentPlayerProgression
   account: AccountProgression
   tutorial: TutorialSaveState
@@ -47,22 +52,33 @@ export interface TutorialSaveState {
 }
 
 interface SaveFile extends PersistentGameData {
+  version: 4
+}
+
+interface LegacyVersionThreeSave
+  extends Omit<
+    PersistentGameData,
+    'core'
+  > {
+  mag: Omit<CoreData, 'stage'>
   version: 3
 }
 
 interface LegacyVersionTwoSave
   extends Omit<
     PersistentGameData,
-    'tutorial'
+    'tutorial' | 'core'
   > {
+  mag: Omit<CoreData, 'stage'>
   version: 2
 }
 
 interface LegacyVersionOneSave
   extends Omit<
     PersistentGameData,
-    'account' | 'tutorial'
+    'account' | 'tutorial' | 'core'
   > {
+  mag: Omit<CoreData, 'stage'>
   version: 1
 }
 
@@ -119,13 +135,15 @@ export class PersistenceSystem {
           parsed
         )
       ) {
-        return this.removeTestWeapons({
+        return this.persistMigration({
           inventory:
             parsed.inventory,
           equippedWeapon:
             parsed.equippedWeapon,
-          mag:
-            parsed.mag,
+          core:
+            this.migrateLegacyCore(
+              parsed.mag
+            ),
           player:
             parsed.player,
           account:
@@ -140,19 +158,80 @@ export class PersistenceSystem {
           parsed
         )
       ) {
-        return this.removeTestWeapons({
+        return this.persistMigration({
           inventory:
             parsed.inventory,
           equippedWeapon:
             parsed.equippedWeapon,
-          mag:
-            parsed.mag,
+          core:
+            this.migrateLegacyCore(
+              parsed.mag
+            ),
           player:
             parsed.player,
           account:
             parsed.account,
           tutorial:
             createDefaultTutorialState(),
+        })
+      }
+
+      if (
+        this.isLegacyVersionThreeSave(
+          parsed
+        )
+      ) {
+        return this.persistMigration({
+          inventory:
+            parsed.inventory,
+          equippedWeapon:
+            parsed.equippedWeapon,
+          core:
+            this.migrateLegacyCore(
+              parsed.mag
+            ),
+          player:
+            parsed.player,
+          account:
+            parsed.account,
+          tutorial:
+            parsed.tutorial,
+        })
+      }
+
+      if (
+        this.isRecord(parsed) &&
+        parsed.version === 4 &&
+        this.hasValidCurrentData(
+          parsed
+        ) &&
+        !this.isCore(
+          parsed.core
+        ) &&
+        this.isLegacyCore(
+          parsed.core
+        )
+      ) {
+        return this.persistMigration({
+          inventory:
+            parsed.inventory as
+              WeaponItem[],
+          equippedWeapon:
+            parsed.equippedWeapon as
+              WeaponItem | null,
+          core:
+            this.migrateLegacyCore(
+              parsed.core
+            ),
+          player:
+            parsed.player as
+              PersistentPlayerProgression,
+          account:
+            parsed.account as
+              AccountProgression,
+          tutorial:
+            parsed.tutorial as
+              TutorialSaveState,
         })
       }
 
@@ -177,7 +256,7 @@ export class PersistenceSystem {
 
   save(data: PersistentGameData) {
     const saveFile: SaveFile = {
-      version: 3,
+      version: 4,
       ...this.clone(data),
     }
 
@@ -205,8 +284,8 @@ export class PersistenceSystem {
       inventory,
       equippedWeapon:
         null,
-      mag:
-        createStarterMag(),
+      core:
+        createStarterCore(),
       player: {
         level:
           player.level,
@@ -259,10 +338,10 @@ export class PersistenceSystem {
         data.equippedWeapon
           ? { ...data.equippedWeapon }
           : null,
-      mag: {
-        ...data.mag,
+      core: {
+        ...data.core,
         stats: {
-          ...data.mag.stats,
+          ...data.core.stats,
         },
       },
       player: {
@@ -285,7 +364,7 @@ export class PersistenceSystem {
   ): value is SaveFile {
     if (
       !this.isRecord(value) ||
-      value.version !== 3 ||
+      value.version !== 4 ||
       !Array.isArray(value.inventory) ||
       value.inventory.length > 30 ||
       !value.inventory.every(
@@ -297,7 +376,7 @@ export class PersistenceSystem {
           value.equippedWeapon
         )
       ) ||
-      !this.isMag(value.mag) ||
+      !this.isCore(value.core) ||
       !this.isPlayer(value.player) ||
       !this.isAccount(value.account) ||
       !this.isTutorial(value.tutorial)
@@ -319,13 +398,27 @@ export class PersistenceSystem {
     )
   }
 
+  private isLegacyVersionThreeSave(
+    value: unknown
+  ): value is LegacyVersionThreeSave {
+    return (
+      this.isRecord(value) &&
+      value.version === 3 &&
+      this.hasValidLegacyData(
+        value
+      ) &&
+      this.isAccount(value.account) &&
+      this.isTutorial(value.tutorial)
+    )
+  }
+
   private isLegacyVersionTwoSave(
     value: unknown
   ): value is LegacyVersionTwoSave {
     return (
       this.isRecord(value) &&
       value.version === 2 &&
-      this.hasValidCoreData(value) &&
+      this.hasValidLegacyData(value) &&
       this.isAccount(value.account)
     )
   }
@@ -336,7 +429,7 @@ export class PersistenceSystem {
     return (
       this.isRecord(value) &&
       value.version === 1 &&
-      this.hasValidCoreData(value)
+      this.hasValidLegacyData(value)
     )
   }
 
@@ -374,7 +467,7 @@ export class PersistenceSystem {
     })
   }
 
-  private hasValidCoreData(
+  private hasValidLegacyData(
     value: Record<string, unknown>
   ) {
     if (
@@ -389,7 +482,7 @@ export class PersistenceSystem {
           value.equippedWeapon
         )
       ) ||
-      !this.isMag(value.mag) ||
+      !this.isLegacyCore(value.mag) ||
       !this.isPlayer(value.player)
     ) {
       return false
@@ -405,6 +498,56 @@ export class PersistenceSystem {
         item =>
           item.id ===
           equippedWeapon.id
+      )
+    )
+  }
+
+  private hasValidCurrentData(
+    value:
+      Record<string, unknown>
+  ) {
+    return (
+      Array.isArray(
+        value.inventory
+      ) &&
+      value.inventory.length <= 30 &&
+      value.inventory.every(
+        item =>
+          this.isWeapon(
+            item
+          )
+      ) &&
+      (
+        value.equippedWeapon ===
+          null ||
+        this.isWeapon(
+          value.equippedWeapon
+        )
+      ) &&
+      this.isLegacyCore(
+        value.core
+      ) &&
+      this.isPlayer(
+        value.player
+      ) &&
+      this.isAccount(
+        value.account
+      ) &&
+      this.isTutorial(
+        value.tutorial
+      ) &&
+      (
+        value.equippedWeapon ===
+          null ||
+        value.inventory.some(
+          item =>
+            this.isWeapon(item) &&
+            item.id ===
+              (
+                value.equippedWeapon as
+                  WeaponItem
+              ).id
+        )
       )
     )
   }
@@ -433,9 +576,33 @@ export class PersistenceSystem {
     )
   }
 
-  private isMag(
+  private isCore(
     value: unknown
-  ): value is MagData {
+  ): value is CoreData {
+    return (
+      this.isLegacyCore(value) &&
+      [
+        CoreStage.Dormant,
+        CoreStage.Awakened,
+      ].includes(
+        (
+          value as
+            Record<
+              string,
+              unknown
+            >
+        ).stage as
+          CoreData['stage']
+      )
+    )
+  }
+
+  private isLegacyCore(
+    value: unknown
+  ): value is Omit<
+    CoreData,
+    'stage'
+  > {
     return (
       this.isRecord(value) &&
       typeof value.id === 'string' &&
@@ -448,6 +615,43 @@ export class PersistenceSystem {
       this.isInteger(value.stats.dexterity, 0) &&
       this.isInteger(value.stats.energy, 0)
     )
+  }
+
+  private migrateLegacyCore(
+    legacy:
+      Omit<CoreData, 'stage'>
+  ): CoreData {
+    // Legacy v0.11.4 save migration only.
+    return {
+      ...legacy,
+      id:
+        legacy.id ===
+          'starter-mag'
+          ? 'starter-core'
+          : legacy.id,
+      stage:
+        legacy.level >= 10
+          ? CoreStage.Awakened
+          : CoreStage.Dormant,
+    }
+  }
+
+  private persistMigration(
+    data:
+      PersistentGameData
+  ) {
+    const migrated =
+      this.removeTestWeapons(
+        data
+      )
+
+    // The legacy record is only superseded
+    // after the current schema writes safely.
+    this.save(
+      migrated
+    )
+
+    return migrated
   }
 
   private isPlayer(

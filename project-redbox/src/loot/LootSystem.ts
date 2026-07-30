@@ -40,6 +40,9 @@ interface LootSystemConfig {
       item:
         WeaponItem
     ) => void
+
+  getPickupRadiusMultiplier:
+    () => number
 }
 
 export class LootSystem {
@@ -58,6 +61,11 @@ export class LootSystem {
   private onRedBoxCollected:
     LootSystemConfig['onRedBoxCollected']
 
+  private getPickupRadiusMultiplier:
+    LootSystemConfig[
+      'getPickupRadiusMultiplier'
+    ]
+
   constructor(
     config:
       LootSystemConfig
@@ -73,6 +81,9 @@ export class LootSystem {
 
     this.onRedBoxCollected =
       config.onRedBoxCollected
+
+    this.getPickupRadiusMultiplier =
+      config.getPickupRadiusMultiplier
   }
 
   update() {
@@ -273,7 +284,21 @@ export class LootSystem {
         Phaser.Geom.Intersects.RectangleToRectangle(
           this.player.getBounds(),
           loot.object.getBounds()
-        )
+        ) ||
+        Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          loot.object.x,
+          loot.object.y
+        ) <=
+          (
+            (
+              this.player.width +
+              loot.object.width
+            ) /
+            2
+          ) *
+          this.getPickupRadiusMultiplier()
 
       if (
         !collected

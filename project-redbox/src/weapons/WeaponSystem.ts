@@ -80,13 +80,13 @@ onDamageDealt?: (
   critical: boolean
 ) => void
 
-getMagAttackMultiplier:
+getCoreAttackMultiplier:
   () => number
 
-getMagCriticalChanceBonus:
+getCoreCriticalChanceBonus:
   () => number
 
-  getMagEnergyMultiplier:
+  getCoreEnergyMultiplier:
   () => number
 
   feedback:
@@ -127,14 +127,14 @@ export class WeaponSystem {
   private onDamageDealt?:
     WeaponSystemConfig['onDamageDealt']
 
-  private getMagAttackMultiplier:
-  WeaponSystemConfig['getMagAttackMultiplier']
+  private getCoreAttackMultiplier:
+    WeaponSystemConfig['getCoreAttackMultiplier']
 
-private getMagCriticalChanceBonus:
-  WeaponSystemConfig['getMagCriticalChanceBonus']
+private getCoreCriticalChanceBonus:
+  WeaponSystemConfig['getCoreCriticalChanceBonus']
 
-private getMagEnergyMultiplier:
-  WeaponSystemConfig['getMagEnergyMultiplier']
+private getCoreEnergyMultiplier:
+  WeaponSystemConfig['getCoreEnergyMultiplier']
 
   private feedback:
     CombatFeedbackManager
@@ -268,14 +268,14 @@ private getMagEnergyMultiplier:
     this.onDamageDealt =
       config.onDamageDealt
 
-      this.getMagAttackMultiplier =
-  config.getMagAttackMultiplier
+      this.getCoreAttackMultiplier =
+        config.getCoreAttackMultiplier
 
-this.getMagCriticalChanceBonus =
-  config.getMagCriticalChanceBonus
+this.getCoreCriticalChanceBonus =
+  config.getCoreCriticalChanceBonus
 
-this.getMagEnergyMultiplier =
-  config.getMagEnergyMultiplier
+this.getCoreEnergyMultiplier =
+  config.getCoreEnergyMultiplier
 
     this.feedback =
       config.feedback
@@ -2142,16 +2142,16 @@ private calculateDamage(
   const weaponAttackMultiplier =
     this.getAttackMultiplier()
 
-  // MAG Power bonus.
-  const magAttackMultiplier =
-    this.getMagAttackMultiplier()
+  // Core Power bonus.
+  const coreAttackMultiplier =
+    this.getCoreAttackMultiplier()
 
   let damage =
     baseDamage *
     weaponAttackMultiplier *
-    magAttackMultiplier
+    coreAttackMultiplier
 
-  // MAG Energy gives an additional
+  // Core Energy gives an additional
   // damage bonus to Rare weapons.
   if (
     this.equippedWeapon
@@ -2159,11 +2159,11 @@ private calculateDamage(
     'rare'
   ) {
     damage *=
-      this.getMagEnergyMultiplier()
+      this.getCoreEnergyMultiplier()
   }
 
   // Weapon's rolled crit chance
-  // plus MAG Dexterity bonus.
+  // plus Core Dexterity bonus.
   const criticalChance =
     Math.min(
       0.95,
@@ -2172,7 +2172,7 @@ private calculateDamage(
           ?.criticalChance ??
         0
       ) +
-      this.getMagCriticalChanceBonus()
+      this.getCoreCriticalChanceBonus()
     )
 
   const criticalDamage =

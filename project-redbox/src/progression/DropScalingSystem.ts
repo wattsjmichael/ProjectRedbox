@@ -3,8 +3,8 @@ import type {
 } from '../items/ItemTypes'
 
 import type {
-  MagData,
-} from '../mag/MagTypes'
+  CoreData,
+} from '../core/CoreTypes'
 
 import type {
   AccountProgression,
@@ -21,19 +21,19 @@ export interface DropScaling {
 
 export class DropScalingSystem {
   static calculate(
-    mag:
-      MagData | null,
+    core:
+      CoreData | null,
     equippedWeapon:
       WeaponItem | null,
     account:
       AccountProgression
   ):
     DropScaling {
-    const magScore =
+    const coreScore =
       Math.max(
         0,
         (
-          mag?.level ??
+          core?.level ??
           1
         ) - 1
       ) *
@@ -69,7 +69,7 @@ export class DropScalingSystem {
     const progressionScore =
       Number(
         (
-          magScore +
+          coreScore +
           rarityScore +
           weaponScore +
           completedDropScore

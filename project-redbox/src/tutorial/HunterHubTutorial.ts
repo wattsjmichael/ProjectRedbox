@@ -124,7 +124,7 @@ export class HunterHubTutorial {
     }
   }
 
-  onMagFed() {
+  onCoreFed() {
     if (
       this.isAtStep(
         'feed'
@@ -210,7 +210,7 @@ export class HunterHubTutorial {
       this.createBodyText(
         640,
         340,
-        'This is your Hunter Hub. Prepare your equipment, strengthen your MAG, and launch your next drop from here.',
+        'This is your Hunter Hub. Prepare your equipment, strengthen your Core, and launch your next drop from here.',
         520
       )
 
@@ -287,7 +287,7 @@ export class HunterHubTutorial {
           930,
           192,
           260,
-          'CONTINUE TO MAG',
+          'CONTINUE TO CORE',
           () => {
             this.advanceTo(
               'feed'
@@ -318,9 +318,9 @@ export class HunterHubTutorial {
       this.hasFeedableItem()
 
     this.createInstructionPanel(
-      'FEED YOUR MAG',
+      'FEED YOUR CORE',
       canFeed
-        ? 'Select unwanted equipment, then feed it to your MAG. The tutorial advances only after a successful feed.'
+        ? 'Select unwanted equipment, then feed it to your Core. The tutorial advances only after a successful feed.'
         : 'You have no spare equipment to feed. Recover loot during a drop, then feed it from the Hub later.'
     )
 
