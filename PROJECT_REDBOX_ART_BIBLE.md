@@ -72,7 +72,7 @@ Use bright accents for:
 - Weapon fire
 - Enemy weak points
 - Hunter visor
-- MAG
+- Core
 - Red Boxes
 - Rare loot
 - Interactive objects
@@ -163,7 +163,7 @@ Approximate in-game display sizes:
 | Wyrm boss | 120–180 px |
 | Common pickup | 20–30 px |
 | Red Box | 32–44 px |
-| MAG | 20–28 px |
+| Core | 20–28 px |
 | Small projectile | 8–16 px |
 | Heavy projectile | 16–28 px |
 
@@ -350,7 +350,7 @@ Suggested hierarchy:
 | High rarity | Purple |
 | Red Box | Saturated red |
 | Healing | Green or teal |
-| MAG-related | Cyan or gold |
+| Core-related | Cyan or gold |
 
 The Red Box must always remain unmistakably red.
 
@@ -544,26 +544,60 @@ Common pickups should use:
 
 ---
 
-# 13. MAG Art Direction
+# 13. Core Art Direction
 
-The MAG should feel:
+The Core is an evolving autonomous support module equipped by the Hunter. It supports the Hunter without becoming the protagonist, a mascot, or a class identity.
+
+Its visual target is:
 
 - Small
-- Loyal
-- Mechanical
-- Strange
-- Cute without becoming childish
-- Built from the same technology as the Hunter’s equipment
+- Strictly top-down
+- Mechanical and strange
+- Chunky and readable at 20–28 pixels
+- Built from the same technology as the Hunter's equipment
+- Loaded-era PSOne aggression with Phantasy Star Online-era sci-fi clarity
 
-Preferred traits:
+## Core Silhouette Rule
 
-- Floating body
-- One glowing eye or core
-- Two or three large shapes
-- Minor movement or bobbing
-- Clear evolutionary changes
+The Core must be designed from its silhouette outward. Before color, lighting, surface detail, or animation:
 
-Avoid mascot-style facial expressions.
+1. Produce 10–20 black silhouette thumbnails.
+2. Review them at approximate gameplay size.
+3. Reject designs that read as a generic orb, drone, pet, or pickup.
+4. Select one silhouette with a memorable directional profile.
+5. Build the sprite from that approved shape.
+
+Do not create a finished Core sprite before the silhouette is approved.
+
+Strong silhouette ingredients may include:
+
+- An asymmetric central chassis
+- Two or three large stabilizer fins, clamps, blades, or antenna forms
+- A clear front and rear when viewed directly from above
+- One deliberate negative-space cutout
+- A compact shape that can evolve by opening, extending, or adding one major element
+
+The Dormant Core should look mechanically contained. The Awakened evolution should preserve the same recognizable outline while changing one major silhouette feature.
+
+Avoid:
+
+- Generic floating spheres or polished mechanical orbs
+- Symmetrical mobile-game drones
+- Mascot faces or cute pet proportions
+- Tiny armor panels, vents, wires, and surface noise
+- Painterly lighting used to rescue a weak shape
+- Wings that make it read as fantasy equipment
+- Silhouettes resembling Red Boxes, loot capsules, or enemy cores
+
+## Core Approval Gate
+
+Core art follows three explicit approvals:
+
+1. Black silhouette sheet
+2. Selected silhouette at 20–28 pixel gameplay scale
+3. Finished Dormant sprite and restrained Awakened variation
+
+Stop at each gate for visual-direction approval. Do not generate an entire evolution set in one pass.
 
 ---
 

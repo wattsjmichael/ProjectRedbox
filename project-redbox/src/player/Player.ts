@@ -21,6 +21,10 @@ interface PlayerConfig {
 
   worldHeight:
     number
+
+  startX?: number
+
+  startY?: number
 }
 
 export class Player {
@@ -52,6 +56,9 @@ export class Player {
       Phaser.Input.Keyboard.Key
     >
 
+  private readonly handleWindowBlur =
+    () => this.resetMovementInput()
+
   constructor(
     config: PlayerConfig
   ) {
@@ -69,8 +76,8 @@ export class Player {
 
     this.object =
       this.scene.add.rectangle(
-        200,
-        200,
+        config.startX ?? 200,
+        config.startY ?? 200,
         32,
         32,
         0x00ff88
@@ -134,9 +141,34 @@ export class Player {
         right:
           Phaser.Input.Keyboard.KeyCodes.D,
       }) as Record<
-        string,
+      string,
         Phaser.Input.Keyboard.Key
       >
+
+    window.addEventListener(
+      'blur',
+      this.handleWindowBlur
+    )
+    this.scene.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        window.removeEventListener(
+          'blur',
+          this.handleWindowBlur
+        )
+      }
+    )
+  }
+
+  private resetMovementInput() {
+    this.cursors.left.reset()
+    this.cursors.right.reset()
+    this.cursors.up.reset()
+    this.cursors.down.reset()
+
+    for (const key of Object.values(this.wasd)) {
+      key.reset()
+    }
   }
 
   update(
@@ -270,6 +302,11 @@ export class Player {
   }
 
   destroy() {
+    window.removeEventListener(
+      'blur',
+      this.handleWindowBlur
+    )
+
     if (
       this.visual?.active
     ) {

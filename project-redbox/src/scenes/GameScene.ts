@@ -13,6 +13,10 @@ import type {
 } from '../items/ItemTypes'
 
 import {
+  getWeaponAffixDescriptions,
+} from '../items/WeaponAffixes'
+
+import {
   createDefaultPlayerStats,
 } from '../player/PlayerStats'
 
@@ -45,8 +49,13 @@ import {
 } from '../loot/LootSystem'
 
 import {
-  EncounterManager,
-} from '../encounters/EncounterManager'
+  WastesManager,
+} from '../encounters/WastesManager'
+
+import {
+  WASTES_WORLD_HEIGHT,
+  WASTES_WORLD_WIDTH,
+} from '../encounters/WastesLayout'
 
 import {
   ENCOUNTER_COMPOSITIONS,
@@ -101,10 +110,10 @@ import type {
 export class GameScene
   extends Phaser.Scene {
   private readonly worldWidth =
-    2400
+    WASTES_WORLD_WIDTH
 
   private readonly worldHeight =
-    1800
+    WASTES_WORLD_HEIGHT
 
   private player!:
     Player
@@ -121,11 +130,8 @@ export class GameScene
   private lootSystem!:
     LootSystem
 
-  private encounterManager!:
-    EncounterManager
-
-  private lastEliteEncounterIndex =
-    -10
+  private wastesManager!:
+    WastesManager
 
   private hud!:
     HUD
@@ -261,9 +267,11 @@ export class GameScene
 
     this.createLootSystem()
 
-    this.createEncounterManager()
+    this.createWastesManager()
 
     this.createCrosshair()
+
+    this.configureGameplayCursor()
 
     this.setupDebugControls()
 
@@ -540,9 +548,6 @@ export class GameScene
     this.wyrmSpawned =
       false
 
-    this.lastEliteEncounterIndex =
-      -10
-
     this.awaitingBossReward =
       false
 
@@ -566,61 +571,18 @@ export class GameScene
       this.worldWidth,
       this.worldHeight,
       0x111827
-    )
+    ).setDepth(-30)
 
-    this.add.rectangle(
-      700,
-      450,
-      300,
-      80,
-      0x263244
-    )
-
-    this.add.rectangle(
-      1200,
-      900,
-      100,
-      400,
-      0x263244
-    )
-
-    this.add.rectangle(
-      1800,
-      500,
-      350,
-      100,
-      0x263244
-    )
-
-    this.add.rectangle(
-      1750,
-      1350,
-      400,
-      80,
-      0x263244
-    )
-
-    this.add.rectangle(
-      700,
-      1350,
-      120,
-      350,
-      0x263244
-    )
-
-    this.add
-      .circle(
-        1200,
-        900,
-        300,
-        0x441111,
-        0.08
-      )
-      .setStrokeStyle(
-        3,
-        0x662222,
-        0.4
-      )
+    for (let x = 80; x < this.worldWidth; x += 160) {
+      this.add.rectangle(
+        x,
+        this.worldHeight / 2,
+        2,
+        this.worldHeight,
+        0x29323a,
+        0.18
+      ).setDepth(-29)
+    }
   }
 
   private createPlayer() {
@@ -637,6 +599,12 @@ export class GameScene
 
         worldHeight:
           this.worldHeight,
+
+        startX:
+          220,
+
+        startY:
+          660,
       })
   }
 
@@ -657,6 +625,17 @@ export class GameScene
               amount
             )
           },
+
+        canDamagePlayerFrom:
+          (x, y) =>
+            !this.wastesManager ||
+            this.wastesManager.hasClearLine(
+              x,
+              y,
+              this.player.getObject().x,
+              this.player.getObject().y
+            ),
+
         scaling:
           this.runScaling,
       })
@@ -938,16 +917,26 @@ export class GameScene
       })
   }
 
-  private createEncounterManager() {
-    this.encounterManager =
-      new EncounterManager({
+  private createWastesManager() {
+    this.wastesManager =
+      new WastesManager({
         scene:
           this,
 
         player:
           this.player.getObject(),
 
-        onEncounterTriggered:
+        getEnemies:
+          () =>
+            this.enemyManager.getEnemies(),
+
+        getEnemyType:
+          enemy =>
+            this.enemyManager.getEnemyType(
+              enemy
+            ),
+
+        onZoneActivated:
           (
             zone
           ) =>
@@ -955,18 +944,48 @@ export class GameScene
               zone
             ),
 
-        onEncounterCleared:
+        onZoneCleared:
           (
-            _zone,
+            zone,
             cleared,
             total
           ) => {
             this.handleEncounterCleared(
+              zone,
               cleared,
               total
             )
           },
+
+        onMessage:
+          message =>
+            this.hud.showEncounterMessage(
+              message
+            ),
+
+        onWyrmArenaEntered:
+          () =>
+            this.beginWyrmEncounter(),
+
+        onDebugRemoveEnemy:
+          enemy =>
+            this.enemyManager.removeEnemy(
+              enemy
+            ),
+
+        syncEnemyVisual:
+          enemy =>
+            this.enemyManager.syncEnemyVisualPosition(
+              enemy
+            ),
       })
+
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        this.wastesManager.destroy()
+      }
+    )
   }
 
   private createCrosshair() {
@@ -985,56 +1004,65 @@ export class GameScene
     )
   }
 
+  private configureGameplayCursor() {
+    this.input.setDefaultCursor(
+      'none'
+    )
+
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => {
+        this.input.setDefaultCursor(
+          'default'
+        )
+      }
+    )
+  }
+
   private setupDebugControls() {
-    this.input.keyboard!.on(
-      'keydown-ONE',
-      () => {
-        this.setWeapon(
-          'rifle'
-        )
-      }
-    )
-
-    this.input.keyboard!.on(
-      'keydown-TWO',
-      () => {
-        this.setWeapon(
-          'scattergun'
-        )
-      }
-    )
-
-    this.input.keyboard!.on(
-      'keydown-THREE',
-      () => {
-        this.setWeapon(
-          'cannon'
-        )
-      }
-    )
-
-    this.input.keyboard!.on(
-      'keydown-FOUR',
-      () => {
-        this.setWeapon(
-          'greatsword'
-        )
-      }
-    )
-
-    this.input.keyboard!.on(
-      'keydown-FIVE',
-      () => {
-        this.spawnWyrmDebug()
-      }
-    )
-
     this.input.keyboard!.on(
       'keydown-I',
       () => {
         this.toggleInventory()
       }
     )
+
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    const weapons: WeaponType[] = [
+      'rifle',
+      'scattergun',
+      'cannon',
+      'greatsword',
+    ]
+
+    weapons.forEach((weapon, index) => {
+      this.input.keyboard!.on(
+        `keydown-${['ONE', 'TWO', 'THREE', 'FOUR'][index]}`,
+        () => this.setWeapon(weapon)
+      )
+    })
+
+    this.input.keyboard!.on(
+      'keydown-FIVE',
+      () => this.spawnWyrmDebug()
+    )
+    this.input.keyboard!.on(
+      'keydown-F6',
+      () => this.wastesManager.toggleDebug()
+    )
+    this.input.keyboard!.on(
+      'keydown-F7',
+      () => this.wastesManager.forceClearCurrentZone()
+    )
+    ;[0, 1, 2, 3].forEach((sequence, index) => {
+      this.input.keyboard!.on(
+        `keydown-F${index + 8}`,
+        () => this.wastesManager.teleportToSequence(sequence)
+      )
+    })
   }
 
   private spawnWyrmDebug() {
@@ -1062,8 +1090,8 @@ export class GameScene
         }
 
         this.enemyManager.spawnWyrm(
-          1200,
-          900
+          2400,
+          3500
         )
 
         this.hud.showBoss(
@@ -1104,6 +1132,10 @@ export class GameScene
     this.inventoryOpen =
       true
 
+    this.input.setDefaultCursor(
+      'default'
+    )
+
     this.weaponSystem.setEnabled(
       false
     )
@@ -1114,6 +1146,10 @@ export class GameScene
   private closeInventory() {
     this.inventoryOpen =
       false
+
+    this.input.setDefaultCursor(
+      'none'
+    )
 
     this.weaponSystem.setEnabled(
       true
@@ -1141,6 +1177,8 @@ export class GameScene
 
     this.updateCrosshair()
 
+    this.wastesManager.capturePlayerPosition()
+
     this.player.update(
       delta
     )
@@ -1154,11 +1192,13 @@ export class GameScene
         hunter.y
       )
 
-    this.encounterManager.update()
+    this.wastesManager.updateBeforeEnemies()
 
     this.enemyManager.update(
       delta
     )
+
+    this.wastesManager.updateAfterEnemies()
 
     this.lootSystem.update()
 
@@ -1194,23 +1234,27 @@ export class GameScene
     const spawned:
       Phaser.GameObjects.Rectangle[] = []
     const encounterIndex =
-      zone.enemyCount <= 8
-        ? 0
-        : zone.enemyCount <= 10
-          ? 1
-          : zone.enemyCount <= 12
-            ? 2
-            : zone.enemyCount <= 14
-              ? 3
-              : 4
+      zone.sequence
     const budget =
-      6 +
-      encounterIndex * 2
-    const eliteAllowed =
-      encounterIndex >= 3 &&
-      encounterIndex -
-        this.lastEliteEncounterIndex >=
-        2
+      zone.budget
+    const requiredTypes =
+      encounterIndex === 0
+        ? [EnemyType.Fast]
+        : encounterIndex === 1
+          ? [EnemyType.Tank]
+          : [
+              EnemyType.Fast,
+              EnemyType.Tank,
+              EnemyType.Elite,
+            ]
+    const reservedCost =
+      requiredTypes.reduce(
+        (total, type) =>
+          total +
+          ENEMY_BEHAVIORS[type]
+            .spawnCost,
+        0
+      )
     const eligible =
       ENCOUNTER_COMPOSITIONS.filter(
         composition =>
@@ -1222,17 +1266,14 @@ export class GameScene
             encounterIndex <=
               composition.maximumZone
           ) &&
-          (
-            eliteAllowed ||
-            !composition.spawns.some(
-              spawn =>
-                spawn.type ===
-                EnemyType.Elite
-            )
+          !composition.spawns.some(
+            spawn =>
+              spawn.type ===
+              EnemyType.Elite
           ) &&
           getCompositionCost(
             composition
-          ) <= budget
+          ) <= budget - reservedCost
       )
     const weighted =
       eligible.flatMap(
@@ -1249,28 +1290,9 @@ export class GameScene
       weighted[
         Phaser.Math.Between(
           0,
-          Math.max(
-            0,
-            weighted.length - 1
-          )
+          Math.max(0, weighted.length - 1)
         )
-      ] ??
-      ENCOUNTER_COMPOSITIONS[0]
-
-    if (
-      composition.spawns.some(
-        spawn =>
-          spawn.type ===
-          EnemyType.Elite
-      )
-    ) {
-      this.lastEliteEncounterIndex =
-        encounterIndex
-    }
-
-    this.hud.showEncounterMessage(
-      composition.name.toUpperCase()
-    )
+      ] ?? ENCOUNTER_COMPOSITIONS[0]
 
     let spent =
       getCompositionCost(
@@ -1279,6 +1301,21 @@ export class GameScene
     const spawnPlan = [
       ...composition.spawns,
     ]
+
+    for (const type of requiredTypes) {
+      if (
+        spawnPlan.some(
+          spawn => spawn.type === type
+        )
+      ) {
+        continue
+      }
+
+      spawnPlan.push({ type })
+      spent +=
+        ENEMY_BEHAVIORS[type]
+          .spawnCost
+    }
 
     while (
       spent +
@@ -1300,8 +1337,7 @@ export class GameScene
     ) {
       const position =
         this.getEncounterSpawnPosition(
-          zone,
-          planned.angleOffset
+          zone
         )
 
       spawned.push(
@@ -1324,8 +1360,7 @@ export class GameScene
 
   private getEncounterSpawnPosition(
     zone:
-      EncounterZone,
-    angleOffset = 0
+      EncounterZone
   ) {
     const minimumSafeDistance =
       260
@@ -1337,50 +1372,15 @@ export class GameScene
       attempt < 12;
       attempt++
     ) {
-      const playerAngle =
-        Phaser.Math.Angle.Between(
-          this.player.getObject().x,
-          this.player.getObject().y,
-          zone.x,
-          zone.y
-        )
-      const angle =
-        playerAngle +
-        angleOffset +
-        Phaser.Math.FloatBetween(
-          -0.8,
-          0.8
-        )
-      const distance =
-        Phaser.Math.Between(
-          Math.max(
-            150,
-            Math.round(
-              zone.radius * 0.7
-            )
-          ),
-          Math.max(
-            180,
-            zone.radius
-          )
-        )
       const candidate = {
-        x:
-          Phaser.Math.Clamp(
-            zone.x +
-              Math.cos(angle) *
-              distance,
-            48,
-            this.worldWidth - 48
-          ),
-        y:
-          Phaser.Math.Clamp(
-            zone.y +
-              Math.sin(angle) *
-              distance,
-            48,
-            this.worldHeight - 48
-          ),
+        x: Phaser.Math.Between(
+          Math.ceil(zone.spawnRegion.left + 40),
+          Math.floor(zone.spawnRegion.right - 40)
+        ),
+        y: Phaser.Math.Between(
+          Math.ceil(zone.spawnRegion.top + 40),
+          Math.floor(zone.spawnRegion.bottom - 40)
+        ),
       }
       const safeFromPlayer =
         Phaser.Math.Distance.Between(
@@ -1403,42 +1403,26 @@ export class GameScene
 
       if (
         safeFromPlayer &&
-        separated
+        separated &&
+        !this.wastesManager.isPointBlocked(
+          candidate.x,
+          candidate.y,
+          36
+        )
       ) {
         return candidate
       }
     }
 
-    const fallbackAngle =
-      Phaser.Math.Angle.Between(
-        this.player.getObject().x,
-        this.player.getObject().y,
-        zone.x,
-        zone.y
-      ) +
-      angleOffset
-
     return {
-      x:
-        Phaser.Math.Clamp(
-          this.player.getObject().x +
-            Math.cos(fallbackAngle) *
-            minimumSafeDistance,
-          48,
-          this.worldWidth - 48
-        ),
-      y:
-        Phaser.Math.Clamp(
-          this.player.getObject().y +
-            Math.sin(fallbackAngle) *
-            minimumSafeDistance,
-          48,
-          this.worldHeight - 48
-        ),
+      x: zone.spawnRegion.centerX,
+      y: zone.spawnRegion.centerY,
     }
   }
 
   private handleEncounterCleared(
+    _zone:
+      EncounterZone,
     cleared:
       number,
 
@@ -1449,31 +1433,17 @@ export class GameScene
       `AREA SECURED — ${cleared}/${total}`
     )
 
+  }
+
+  private beginWyrmEncounter() {
     if (
-      cleared !==
-      total ||
+      this.isGameOver ||
       this.wyrmSpawned
     ) {
       return
     }
 
-    this.wyrmSpawned =
-      true
-
-    this.time.delayedCall(
-      1200,
-      () => {
-        this.beginWyrmEncounter()
-      }
-    )
-  }
-
-  private beginWyrmEncounter() {
-    if (
-      this.isGameOver
-    ) {
-      return
-    }
+    this.wyrmSpawned = true
 
     this.hud.showEncounterMessage(
       'WARNING: WYRM DETECTED'
@@ -1501,8 +1471,8 @@ export class GameScene
         }
 
         this.enemyManager.spawnWyrm(
-          1200,
-          900
+          2400,
+          3500
         )
 
         this.hud.showBoss(
@@ -1679,6 +1649,10 @@ export class GameScene
         enemyType
       )
 
+    this.wastesManager.notifyEnemyDefeated(
+      enemy
+    )
+
     this.enemyManager.removeEnemy(
       enemy
     )
@@ -1694,9 +1668,14 @@ export class GameScene
         y
       )
     } else {
+      const dropPoint =
+        this.wastesManager.getSafeDropPoint(
+          x,
+          y
+        )
       this.lootSystem.tryDrop(
-        x,
-        y
+        dropPoint.x,
+        dropPoint.y
       )
     }
 
@@ -1851,11 +1830,11 @@ export class GameScene
       this.hud.showRareLootMessage(
         item.name.toUpperCase(),
         [
-          `ATK ${item.attack}`,
-          `SPD ${item.speed}`,
-          `CRIT ${(item.criticalChance * 100).toFixed(0)}%`,
-          `CRIT DMG ${(item.criticalDamage * 100).toFixed(0)}%`,
-        ].join('   ')
+          `${item.rarity.toUpperCase()} // ${this.getLootComparison(item)}`,
+          `ATK ${item.attack}   SPD ${item.speed}   CRIT ${(item.criticalChance * 100).toFixed(0)}%   CRIT DMG ${(item.criticalDamage * 100).toFixed(0)}%`,
+          ...getWeaponAffixDescriptions(item),
+          'PRESS I TO INSPECT OR EQUIP',
+        ].join('\n')
       )
     } else {
       this.hud.showRareLootMessage(
@@ -1877,6 +1856,43 @@ export class GameScene
         }
       )
     }
+  }
+
+  private getLootComparison(
+    item: WeaponItem
+  ) {
+    const equipped =
+      this.inventorySystem.getEquippedItem()
+
+    if (!equipped) {
+      return '▲ UPGRADE AVAILABLE'
+    }
+
+    const selected = [
+      item.attack,
+      item.speed,
+      item.criticalChance,
+      item.criticalDamage,
+    ]
+    const current = [
+      equipped.attack,
+      equipped.speed,
+      equipped.criticalChance,
+      equipped.criticalDamage,
+    ]
+    let better = 0
+    let worse = 0
+
+    selected.forEach((value, index) => {
+      const baseline = current[index]
+      const threshold = Math.max(Math.abs(baseline) * 0.04, 0.01)
+      if (value > baseline + threshold) better++
+      if (value < baseline - threshold) worse++
+    })
+
+    if (better > worse) return '▲ BETTER'
+    if (worse > better) return '▼ TRADEOFF'
+    return '≈ SIMILAR'
   }
 
   private savePersistentState() {

@@ -417,24 +417,27 @@ Those come after the persistent progression loop proves itself.
 # Day 33 — Sun 8/16
 ## ENEMY PERSONALITY
 
-* [ ] Improve Fast enemy behavior
-* [ ] Improve Tank enemy behavior
-* [ ] Improve Elite encounters
-* [ ] Tune encounter pacing
-* [ ] Improve spawn composition
-* [ ] Commit — `v0.11.4 - Enemy Identity`
+* [x] Improve Fast enemy behavior
+* [x] Improve Tank enemy behavior
+* [x] Improve Elite encounters
+* [x] Tune encounter pacing
+* [x] Improve spawn composition
+* [x] Commit — `v0.11.4 - Enemy Identity`
 
 ---
 
 # Day 34 — Mon 8/17
-## MAG EVOLUTION
+## CORE EVOLUTION
 
-* [ ] First MAG evolution stage
-* [ ] Better MAG progression display
-* [ ] Evolution milestones
-* [ ] Evolution bonuses
-* [ ] Improve MAG feeding feedback
-* [ ] Commit — `v0.11.5 - Evolution`
+* [x] Rename MAG system to Core
+* [x] First Core evolution stage
+* [x] Better Core progression display
+* [x] Evolution milestones
+* [x] Core evolution bonuses
+* [x] Improve Core feeding feedback
+* [x] Update UI and terminology
+* [x] Preserve save compatibility where possible
+* [x] Commit — `v0.11.5 - Core Evolution`
 
 ---
 
@@ -457,36 +460,305 @@ Those come after the persistent progression loop proves itself.
 # Day 36 — Wed 8/19
 ## LOOT CHASE
 
-* [ ] Expand affix pool
-* [ ] Improve affix balance
-* [ ] Improve loot tables
-* [ ] Improve rarity presentation
-* [ ] Tune Red Box excitement
-* [ ] Commit — `v0.11.7 - Loot Chase`
+* [x] Expand affix pool
+* [x] Improve affix balance
+* [x] Improve loot tables
+* [x] Improve rarity presentation
+* [x] Tune Red Box excitement
+* [x] Commit — `v0.11.7 - Loot Chase`
 
 ---
 
 # Day 37 — Thu 8/20
 ## BALANCE PASS
 
-* [ ] Multi-run playtest
-* [ ] Enemy scaling tuning
-* [ ] Wyrm tuning
-* [ ] Weapon balance
-* [ ] MAG balance
-* [ ] Fix meaningful gameplay bugs
-* [ ] Commit — `v0.11.8 - Balance Pass`
+* [x] Multi-run playtest
+* [x] Enemy scaling tuning
+* [x] Wyrm tuning
+* [x] Weapon balance
+* [x] MAG balance
+* [x] Fix meaningful gameplay bugs
+* [x] Commit — `v0.11.8 - Balance Pass`
 
 ---
 
 # Day 38 — Fri 8/21
 ## THE HUNT CONTINUES
 
-* [ ] Fresh-save playtest
-* [ ] Complete five consecutive drops
-* [ ] Verify progression loop
+* [x] Fresh-save playtest
+* [x] Complete five consecutive drops
+* [x] Verify progression loop
+* [x] Production build
+* [x] Upload new itch.io build
+* [x] Test live build
+* [x] Send build to Jeff
+* [x] Commit — `v0.12.0 - THE HUNT CONTINUES`
+
+
+# Project Redbox
+# Sprint 3 Roadmap
+## v0.13.0 → v0.14.0
+### **BUILD YOUR HUNTER**
+
+**Sprint Theme:** Turn persistent progression into a real character-building experience. Add Hunter levels, armor, visual equipment identity, sound, and a lightweight local profile flow.
+
+---
+
+# Day 39 — Sat 8/22
+## HUNTER PROFILES
+
+* [ ] Add Hunter profile selection screen
+* [ ] Create new Hunter
+* [ ] Continue existing Hunter
+* [ ] Hunter name entry
+* [ ] Display Hunter level, equipped weapon, armor, and Core
+* [ ] Add profile deletion confirmation
+* [ ] Support multiple local Hunter profiles
+* [ ] Preserve existing save through migration
+* [ ] Commit — `v0.13.0 - Choose Your Hunter`
+
+> For this sprint, “login” means a polished local Hunter profile screen. Real accounts and cloud saves belong in a later infrastructure sprint.
+
+---
+
+# Day 40 — Sun 8/23
+## HUNTER LEVELS
+
+* [ ] Add persistent Hunter XP
+* [ ] Add persistent Hunter level
+* [ ] Award Hunter XP after completed drops
+* [ ] Award bonus XP for Wyrm defeats
+* [ ] Display XP gained on results screen
+* [ ] Show Hunter level in Hub and profile screen
+* [ ] Create level curve configuration
+* [ ] Migrate existing saves safely
+* [ ] Commit — `v0.13.1 - Level Up`
+
+---
+
+# Day 41 — Mon 8/24
+## LEVEL REWARDS
+
+* [ ] Define early Hunter level milestones
+* [ ] Add small permanent stat growth
+* [ ] Unlock armor slot through progression
+* [ ] Unlock harder drop scaling gradually
+* [ ] Add level-up presentation
+* [ ] Show next-level reward preview
+* [ ] Prevent Hunter levels from replacing equipment progression
+* [ ] Commit — `v0.13.2 - Growing Stronger`
+
+---
+
+# Day 42 — Tue 8/25
+## ARMOR FOUNDATION
+
+* [ ] Create Armor item data model
+* [ ] Add armor rarity
+* [ ] Add Defense stat
+* [ ] Add secondary armor stats
+* [ ] Add armor affix support
+* [ ] Add equipped armor slot
+* [ ] Save and load equipped armor
+* [ ] Add starter armor
+* [ ] Commit — `v0.13.3 - Suit Up`
+
+---
+
+# Day 43 — Wed 8/26
+## ARMOR LOOT
+
+* [ ] Add armor to loot tables
+* [ ] Add armor drops from normal enemies
+* [ ] Add guaranteed armor opportunities
+* [ ] Add rare armor from Red Boxes
+* [ ] Add boss armor drops
+* [ ] Balance weapon versus armor drop frequency
+* [ ] Add armor names and descriptions
+* [ ] Confirm full-inventory behavior
+* [ ] Commit — `v0.13.4 - Armor Hunt`
+
+---
+
+# Day 44 — Thu 8/27
+## ARMOR EQUIPMENT
+
+* [ ] Display armor in Hunter Hub
+* [ ] Add armor selection and Equip action
+* [ ] Compare selected armor with equipped armor
+* [ ] Clearly display Defense changes
+* [ ] Prevent equipped armor from being fed to the Core
+* [ ] Show armor in Recent Finds
+* [ ] Add armor feeding values
+* [ ] Verify persistence across multiple drops
+* [ ] Commit — `v0.13.5 - Armored Hunter`
+
+---
+
+# Day 45 — Fri 8/28
+## DRESS THE HUNTER
+
+* [ ] Visually change Hunter based on equipped armor
+* [ ] Create temporary armor appearance variants
+* [ ] Preserve Hunter readability at gameplay size
+* [ ] Show equipped armor on profile screen
+* [ ] Show equipped armor in Hunter Hub
+* [ ] Keep visuals separate from collision
+* [ ] Track temporary armor art
+* [ ] Commit — `v0.13.6 - Dress for the Drop`
+
+---
+
+# Day 46 — Sat 8/29
+## WEAPON VISUAL IDENTITY
+
+* [ ] Visually display equipped weapon on the Hunter
+* [ ] Distinct Rifle appearance
+* [ ] Distinct Scattergun appearance
+* [ ] Distinct Cannon appearance
+* [ ] Distinct Photon Lance appearance
+* [ ] Distinct Greatsword appearance
+* [ ] Match attack origin to visible weapon
+* [ ] Preserve aiming and combo behavior
+* [ ] Commit — `v0.13.7 - Armed and Ready`
+
+---
+
+# Day 47 — Sun 8/30
+## RARITY APPEARANCE
+
+* [ ] Add subtle visual differences by weapon rarity
+* [ ] Add subtle visual differences by armor rarity
+* [ ] Add controlled energy accents
+* [ ] Improve equipment icons
+* [ ] Add rare-item glow without excessive noise
+* [ ] Keep silhouettes consistent within item families
+* [ ] Confirm visuals remain readable in combat
+* [ ] Commit — `v0.13.8 - Look Rare`
+
+---
+
+# Day 48 — Mon 8/31
+## SOUND FOUNDATION
+
+* [ ] Add AudioManager
+* [ ] Add master volume control
+* [ ] Add music volume control
+* [ ] Add effects volume control
+* [ ] Add mute option
+* [ ] Save audio settings
+* [ ] Handle browser autoplay restrictions
+* [ ] Add temporary licensed or original sound assets
+* [ ] Create audio credits documentation
+* [ ] Commit — `v0.13.9 - Make Some Noise`
+
+---
+
+# Day 49 — Tue 9/1
+## COMBAT AUDIO
+
+* [ ] Rifle combo sounds
+* [ ] Scattergun combo sounds
+* [ ] Cannon combo sounds
+* [ ] Photon Lance combo sounds
+* [ ] Greatsword swing and impact sounds
+* [ ] Distinct finisher sounds
+* [ ] Enemy hit and death sounds
+* [ ] Player damage sound
+* [ ] Prevent excessive overlapping audio
+* [ ] Commit — `v0.13.10 - Weapons Online`
+
+---
+
+# Day 50 — Wed 9/2
+## WORLD AUDIO
+
+* [ ] The Wastes ambient loop
+* [ ] Gate locked sound
+* [ ] Gate unlock sound
+* [ ] Red Box drop sound
+* [ ] Red Box reveal sound
+* [ ] Core feeding sound
+* [ ] Core level-up sound
+* [ ] Hunter level-up sound
+* [ ] Wyrm arrival and death sounds
+* [ ] Hunter Hub ambience
+* [ ] Commit — `v0.13.11 - Hear the Wastes`
+
+---
+
+# Day 51 — Thu 9/3
+## CHARACTER POLISH
+
+* [ ] Improve profile-screen presentation
+* [ ] Improve Hunter level display
+* [ ] Improve armor comparison
+* [ ] Improve weapon and armor silhouettes
+* [ ] Improve equipment-change feedback
+* [ ] Improve level-up feedback
+* [ ] Test audio mix during crowded combat
+* [ ] Fix meaningful character-progression bugs
+* [ ] Commit — `v0.13.12 - This Is My Hunter`
+
+---
+
+# Day 52 — Fri 9/4
+## SHIP YOUR HUNTER
+
+* [ ] Fresh-profile playtest
+* [ ] Create and name a new Hunter
+* [ ] Complete first drop
+* [ ] Gain persistent Hunter XP
+* [ ] Level up
+* [ ] Find and equip armor
+* [ ] Confirm armor changes appearance
+* [ ] Equip multiple weapon types
+* [ ] Confirm weapon appearance changes
+* [ ] Feed unwanted equipment to Core
+* [ ] Complete five-drop progression test
+* [ ] Confirm sound settings persist
+* [ ] Confirm old save migration
 * [ ] Production build
-* [ ] Upload new itch.io build
+* [ ] Upload to itch.io
 * [ ] Test live build
 * [ ] Send build to Jeff
-* [ ] Commit — `v0.12.0 - THE HUNT CONTINUES`
+* [ ] Commit — `v0.14.0 - BUILD YOUR HUNTER`
+
+---
+
+# Sprint Guardrails
+
+This sprint should not add:
+
+* Online multiplayer
+* Email/password authentication
+* Cloud saves
+* Full character classes
+* Skill trees
+* Multiple armor slots
+* Cosmetic transmog
+* Armor crafting
+* A new biome
+* A new boss
+* Large animation systems
+
+For the first armor pass, use one equipped suit slot instead of separate helmet, chest, gloves, boots, and pants slots.
+
+The character loop becomes:
+
+```text
+Choose Hunter
+↓
+Enter Drop
+↓
+Earn Hunter XP
+↓
+Find Weapons and Armor
+↓
+Return to Hub
+↓
+Equip a New Look
+↓
+Grow Stronger
+↓
+Start Another Drop

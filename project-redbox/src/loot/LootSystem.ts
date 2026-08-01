@@ -1,16 +1,17 @@
 import Phaser from 'phaser'
 
 import type {
-  WeaponType,
-} from '../weapons/WeaponTypes'
-
-import type {
   WeaponItem,
 } from '../items/ItemTypes'
 
 import {
   ItemGenerator,
 } from '../items/ItemGenerator'
+
+import {
+  LOOT_DROP_RATES,
+  rollWeaponType,
+} from './LootTables'
 
 import type {
   LootDrop,
@@ -105,7 +106,7 @@ export class LootSystem {
 
     if (
       roll <
-      0.05
+      LOOT_DROP_RATES.redBox
     ) {
       this.spawnRedBox(
         x,
@@ -117,7 +118,8 @@ export class LootSystem {
 
     if (
       roll <
-      0.25
+      LOOT_DROP_RATES.redBox +
+      LOOT_DROP_RATES.weapon
     ) {
       const weaponType =
         this.getRandomWeaponType()
@@ -126,6 +128,11 @@ export class LootSystem {
         ItemGenerator.generateWeapon(
           weaponType
         )
+
+      if (item.rarity === 'rare') {
+        this.spawnRedBox(x, y, item)
+        return
+      }
 
       this.spawnWeapon(
         x,
@@ -182,7 +189,8 @@ export class LootSystem {
 
     this.attachLootVisual(
       object,
-      false
+      false,
+      item.rarity
     )
 
     this.lootDrops.push({
@@ -244,19 +252,8 @@ export class LootSystem {
     }
   }
 
-  private getRandomWeaponType():
-    WeaponType {
-    const weaponTypes:
-      WeaponType[] = [
-        'rifle',
-        'scattergun',
-        'cannon',
-        'greatsword',
-      ]
-
-    return Phaser.Utils.Array.GetRandom(
-      weaponTypes
-    )
+  private getRandomWeaponType() {
+    return rollWeaponType()
   }
 
   private checkCollection() {
@@ -300,9 +297,31 @@ export class LootSystem {
           ) *
           this.getPickupRadiusMultiplier()
 
+      const distance =
+        Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          loot.object.x,
+          loot.object.y
+        )
+
       if (
-        !collected
+        loot.type === 'redbox' &&
+        distance <= 190 &&
+        loot.object.getData('anticipated') !== true
       ) {
+        this.beginRedBoxAnticipation(loot)
+      }
+
+      if (
+        !collected ||
+        loot.object.getData('opening') === true
+      ) {
+        continue
+      }
+
+      if (loot.type === 'redbox') {
+        this.beginRedBoxOpen(loot)
         continue
       }
 
@@ -363,6 +382,13 @@ export class LootSystem {
       ) as
         | Phaser.GameObjects.Sprite
         | undefined
+
+    const anticipationRing =
+      loot.object.getData(
+        'anticipationRing'
+      ) as Phaser.GameObjects.Arc | undefined
+
+    anticipationRing?.destroy()
 
     if (
       beam?.active
@@ -452,11 +478,85 @@ export class LootSystem {
     )
   }
 
+  private beginRedBoxAnticipation(
+    loot: LootDrop
+  ) {
+    loot.object.setData('anticipated', true)
+    const ring = this.scene.add.circle(
+      loot.object.x,
+      loot.object.y,
+      35,
+      0xff1111,
+      0.08
+    )
+      .setStrokeStyle(3, 0xff3344, 0.65)
+      .setDepth(GAMEPLAY_DISPLAY.lootRare.depth - 1)
+    loot.object.setData('anticipationRing', ring)
+
+    this.scene.tweens.add({
+      targets: ring,
+      scale: 1.45,
+      alpha: 0.15,
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+    })
+    this.scene.events.emit('combat-audio:red-box-near')
+  }
+
+  private beginRedBoxOpen(
+    loot: LootDrop
+  ) {
+    loot.object.setData('opening', true)
+    const visual = loot.object.getData('visual') as
+      | Phaser.GameObjects.Sprite
+      | undefined
+    const target = visual ?? loot.object
+
+    this.scene.events.emit('combat-audio:red-box-open')
+    this.scene.cameras.main.flash(120, 255, 32, 32)
+    this.scene.tweens.add({
+      targets: target,
+      scaleX: target.scaleX * 1.32,
+      scaleY: target.scaleY * 1.32,
+      alpha: 1,
+      duration: 110,
+      yoyo: true,
+    })
+
+    const reveal = this.scene.add.circle(
+      loot.object.x,
+      loot.object.y,
+      28,
+      0xffffff,
+      0.24
+    )
+      .setStrokeStyle(4, 0xff3344, 0.9)
+      .setDepth(GAMEPLAY_DISPLAY.lootRare.depth + 1)
+
+    this.scene.tweens.add({
+      targets: reveal,
+      scale: 2.2,
+      alpha: 0,
+      duration: 240,
+      onComplete: () => reveal.destroy(),
+    })
+
+    this.scene.time.delayedCall(220, () => {
+      if (!loot.object.active) return
+      const index = this.lootDrops.indexOf(loot)
+      if (index < 0) return
+      this.collectLoot(loot)
+      this.lootDrops.splice(index, 1)
+    })
+  }
+
   private attachLootVisual(
     object:
       Phaser.GameObjects.Rectangle,
     rare:
-      boolean
+      boolean,
+    rarity: WeaponItem['rarity'] = 'rare'
   ) {
     const texture =
       rare
@@ -491,6 +591,10 @@ export class LootSystem {
         .setDepth(
           display.depth
         )
+
+    if (!rare && rarity === 'uncommon') {
+      visual.setTint(0x88ffbb)
+    }
 
     object.setAlpha(0)
     object.setData(

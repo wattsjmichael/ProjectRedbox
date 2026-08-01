@@ -8,6 +8,12 @@ import type {
   LevelGains,
 } from '../progression/ProgressionSystem'
 
+interface HudNotification {
+  message: string
+  kind: 'encounter' | 'loot'
+  holdMs: number
+}
+
 export class HUD {
   private scene:
     Phaser.Scene
@@ -73,6 +79,18 @@ export class HUD {
   private bossHealthText!:
     Phaser.GameObjects.Text
 
+  private notificationQueue:
+    HudNotification[] = []
+
+  private activeNotification:
+    HudNotification | null = null
+
+  private notificationText:
+    Phaser.GameObjects.Text | null = null
+
+  private notificationTween:
+    Phaser.Tweens.Tween | null = null
+
   constructor(
     scene: Phaser.Scene,
     stats: PlayerStats
@@ -87,6 +105,11 @@ export class HUD {
     this.createComboUI()
 
     this.createBossUI()
+
+    this.scene.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      () => this.clearNotifications()
+    )
   }
 
   private create(
@@ -421,6 +444,21 @@ export class HUD {
         )
         .setOrigin(0.5)
         .setScrollFactor(0)
+
+    ;[
+      ...this.comboBoxes,
+      ...this.comboLabels,
+      this.comboTimelineBackground,
+      this.comboEarlyZone,
+      this.comboPerfectZone,
+      this.comboLateZone,
+      this.comboMarker,
+      this.perfectText,
+      this.comboStatusText,
+    ].forEach(
+      object =>
+        object.setDepth(1000)
+    )
 
     this.setComboVisible(
       false
@@ -973,113 +1011,148 @@ export class HUD {
   showEncounterMessage(
     message: string
   ) {
-    const text =
-      this.scene.add
-        .text(
-          640,
-          155,
-          message,
-          {
-            fontFamily:
-              'Arial Black, Arial',
-
-            fontSize:
-              '28px',
-
-            color:
-              '#ff4444',
-          }
-        )
-        .setOrigin(
-          0.5
-        )
-        .setScrollFactor(
-          0
-        )
-
-    this.scene.tweens.add({
-      targets:
-        text,
-
-      alpha:
-        0,
-
-      y:
-        125,
-
-      duration:
-        1200,
-
-      onComplete:
-        () => {
-          text.destroy()
-        },
+    this.queueNotification({
+      message,
+      kind: 'encounter',
+      holdMs: 1550,
     })
   }
 
   showLootMessage(
     message: string
   ) {
-    const text =
-      this.scene.add
-        .text(
-          640,
-          180,
-          message,
-          {
-            fontSize:
-              '24px',
-
-            color:
-              '#ffffff',
-
-            align:
-              'center',
-          }
-        )
-        .setOrigin(
-          0.5
-        )
-        .setScrollFactor(
-          0
-        )
-
-    text.setScale(
-      0.86
-    )
-
     this.scene.cameras.main.shake(
       45,
       0.0015
     )
 
-    this.scene.tweens.add({
-      targets:
-        text,
-
-      alpha:
-        0,
-
-      y:
-        150,
-
-      scale:
-        1,
-
-      duration:
-        900,
-
-      onComplete:
-        () => {
-          text.destroy()
-        },
+    this.queueNotification({
+      message,
+      kind: 'loot',
+      holdMs: 1050,
     })
+  }
+
+  private queueNotification(
+    notification:
+      HudNotification
+  ) {
+    if (
+      notification.kind === 'encounter' &&
+      this.activeNotification?.kind === 'encounter'
+    ) {
+      this.activeNotification = notification
+      this.presentActiveNotification()
+      return
+    }
+
+    const pendingIndex =
+      this.notificationQueue.findIndex(
+        pending =>
+          pending.kind === notification.kind
+      )
+
+    if (pendingIndex >= 0) {
+      this.notificationQueue[pendingIndex] = notification
+    } else {
+      this.notificationQueue.push(notification)
+    }
+
+    if (!this.activeNotification) {
+      this.showNextNotification()
+    }
+  }
+
+  private showNextNotification() {
+    this.activeNotification =
+      this.notificationQueue.shift() ?? null
+
+    if (!this.activeNotification) {
+      return
+    }
+
+    this.presentActiveNotification()
+  }
+
+  private presentActiveNotification() {
+    const notification =
+      this.activeNotification
+
+    if (!notification) {
+      return
+    }
+
+    this.notificationTween?.stop()
+    this.notificationText?.destroy()
+
+    const encounter =
+      notification.kind === 'encounter'
+    this.notificationText =
+      this.scene.add.text(
+        640,
+        155,
+        notification.message,
+        {
+          fontFamily: encounter
+            ? 'Arial Black, Arial'
+            : 'Arial',
+          fontSize: encounter
+            ? '28px'
+            : '24px',
+          color: encounter
+            ? '#ff6655'
+            : '#ffffff',
+          align: 'center',
+        }
+      )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(1000)
+
+    this.notificationTween =
+      this.scene.tweens.add({
+        targets: this.notificationText,
+        alpha: 0,
+        y: 130,
+        delay: notification.holdMs,
+        duration: 450,
+        onComplete: () => {
+          this.notificationText?.destroy()
+          this.notificationText = null
+          this.notificationTween = null
+          this.activeNotification = null
+          this.showNextNotification()
+        },
+      })
+  }
+
+  private clearNotifications() {
+    this.notificationTween?.stop()
+    this.notificationTween = null
+    this.notificationText?.destroy()
+    this.notificationText = null
+    this.notificationQueue = []
+    this.activeNotification = null
   }
 
   showRareLootMessage(
     weaponName: string,
     details = ''
   ) {
+    this.clearNotifications()
+
+    const card = this.scene.add.rectangle(
+      640,
+      220,
+      1000,
+      270,
+      0x090b0f,
+      0.94
+    )
+      .setStrokeStyle(4, 0xe50914, 0.9)
+      .setScrollFactor(0)
+      .setDepth(999)
+
     const rareText =
       this.scene.add
         .text(
@@ -1122,6 +1195,10 @@ export class HUD {
 
             align:
               'center',
+
+            wordWrap: {
+              width: 920,
+            },
           }
         )
         .setOrigin(
@@ -1149,6 +1226,10 @@ export class HUD {
 
             align:
               'center',
+
+            wordWrap: {
+              width: 920,
+            },
           }
         )
         .setOrigin(
@@ -1157,6 +1238,10 @@ export class HUD {
         .setScrollFactor(
           0
         )
+
+    rareText.setDepth(1000)
+    weaponText.setDepth(1000)
+    detailsText.setDepth(1000)
 
     this.scene.cameras.main.flash(
       300,
@@ -1172,6 +1257,7 @@ export class HUD {
 
     this.scene.tweens.add({
       targets: [
+        card,
         rareText,
         weaponText,
         detailsText,
@@ -1184,7 +1270,7 @@ export class HUD {
         '-=25',
 
       delay:
-        1400,
+        2600,
 
       duration:
         700,
@@ -1194,6 +1280,7 @@ export class HUD {
           rareText.destroy()
           weaponText.destroy()
           detailsText.destroy()
+          card.destroy()
         },
     })
   }
@@ -1228,6 +1315,9 @@ export class HUD {
         .setScrollFactor(
           0
         )
+        .setDepth(
+          1000
+        )
 
     const statsText =
       this.scene.add
@@ -1251,6 +1341,9 @@ export class HUD {
         )
         .setScrollFactor(
           0
+        )
+        .setDepth(
+          1000
         )
 
     levelText.setAlpha(

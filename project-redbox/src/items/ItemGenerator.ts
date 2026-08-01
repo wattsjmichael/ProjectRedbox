@@ -4,9 +4,13 @@ import type {
 
 import type {
   ItemRarity,
-  WeaponAffix,
   WeaponItem,
 } from './ItemTypes'
+
+import {
+  applyGeneratedAffixes,
+  getWeaponDisplayName,
+} from './WeaponAffixes'
 
 export class ItemGenerator {
   static generateWeapon(
@@ -93,12 +97,10 @@ export class ItemGenerator {
         ),
     }
 
-    if (
-      rarity ===
-      'rare'
-    ) {
-      this.applyRareAffix(
-        item
+    if (rarity !== 'common') {
+      applyGeneratedAffixes(
+        item,
+        rarity === 'rare'
       )
     }
 
@@ -150,121 +152,6 @@ export class ItemGenerator {
 
       case 'rare':
         return 1.35
-    }
-  }
-
-  private static applyRareAffix(
-    item: WeaponItem
-  ) {
-    const affixes:
-      WeaponAffix[] = [
-        'heavy',
-        'rapid',
-        'deadeye',
-        'brutal',
-      ]
-
-    const affix =
-      affixes[
-        Math.floor(
-          Math.random() *
-          affixes.length
-        )
-      ]
-
-    item.affix =
-      affix
-
-    switch (
-      affix
-    ) {
-      case 'heavy':
-        item.attack =
-          Math.round(
-            item.attack *
-            1.3
-          )
-
-        item.speed =
-          Number(
-            Math.max(
-              0.35,
-              item.speed *
-                0.82
-            ).toFixed(
-              2
-            )
-          )
-        break
-
-      case 'rapid':
-        item.speed =
-          Number(
-            (
-              item.speed *
-              1.3
-            ).toFixed(
-              2
-            )
-          )
-
-        item.attack =
-          Math.max(
-            1,
-            Math.round(
-              item.attack *
-              0.82
-            )
-          )
-        break
-
-      case 'deadeye':
-        item.criticalChance =
-          Number(
-            Math.min(
-              0.65,
-              item.criticalChance +
-                0.12
-            ).toFixed(
-              3
-            )
-          )
-        break
-
-      case 'brutal':
-        item.criticalDamage =
-          Number(
-            (
-              item.criticalDamage +
-              0.75
-            ).toFixed(
-              2
-            )
-          )
-        break
-    }
-
-    item.name =
-      `${this.getAffixName(affix)} ${this.getWeaponName(item.weaponType)}`
-  }
-
-  private static getAffixName(
-    affix: WeaponAffix
-  ) {
-    switch (
-      affix
-    ) {
-      case 'heavy':
-        return 'Heavy'
-
-      case 'rapid':
-        return 'Rapid'
-
-      case 'deadeye':
-        return 'Deadeye'
-
-      case 'brutal':
-        return 'Brutal'
     }
   }
 
@@ -349,27 +236,7 @@ export class ItemGenerator {
         rare: 'Prototype',
       }
 
-    return `${rarityNames[rarity]} ${this.getWeaponName(weaponType)}`
-  }
-
-  private static getWeaponName(
-    weaponType: WeaponType
-  ) {
-    const weaponNames:
-      Record<
-        WeaponType,
-        string
-      > = {
-        rifle: 'Rifle',
-        scattergun: 'Scattergun',
-        cannon: 'Cannon',
-        photonLance: 'Photon Lance',
-        greatsword: 'Greatsword',
-      }
-
-    return weaponNames[
-      weaponType
-    ]
+    return `${rarityNames[rarity]} ${getWeaponDisplayName(weaponType)}`
   }
 
   private static generateId() {

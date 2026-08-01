@@ -1,5 +1,38 @@
 # Project Redbox Temporary Asset Log
 
+## wastes_floor_salvage_temp_v1.png
+
+- Category: Environment floor
+- Purpose: Temporary Salvage Yard floor treatment for The Wastes
+- Date added: 2026-07-31
+- AI-generated: Yes
+- Status: Experimental
+- Prompt summary: Strict top-down tileable dirty metal plates, cracked concrete, contaminated soil, and restrained orange salvage markings
+- Replacement priority: High before commercial release
+- Gameplay notes: Loaded as a reusable tiled floor beneath all gameplay objects. Muted through tint and alpha to protect enemy, projectile, telegraph, and loot readability. Live 1280x720 crowd testing remains manual.
+
+## wastes_floor_reactor_temp_v1.png
+
+- Category: Environment floor
+- Purpose: Temporary Reactor Trench floor treatment for The Wastes
+- Date added: 2026-07-31
+- AI-generated: Yes
+- Status: Experimental
+- Prompt summary: Strict top-down dark metal channels with sparse cyan conduits and muted industrial hazard bands
+- Replacement priority: High before commercial release
+- Gameplay notes: Loaded as a reusable tiled floor and kept below collision/debug layers. Cyan accents are restrained to avoid competing with Hunter projectiles. Live 1280x720 crowd testing remains manual.
+
+## wastes_floor_extraction_temp_v1.png
+
+- Category: Environment floor
+- Purpose: Temporary Extraction Pit, Wyrm approach, and boss-arena floor treatment
+- Date added: 2026-07-31
+- AI-generated: Yes
+- Status: Experimental
+- Prompt summary: Strict top-down heavy industrial plating with excavation damage, embedded soil, and worn red warning markings
+- Replacement priority: High before commercial release
+- Gameplay notes: Reused with separate tinting for the Extraction Pit, final approach, and Wyrm arena. The arena adds a sparse containment boundary and crater treatment. Live 1280x720 boss-readability testing remains manual.
+
 ## redbox_sprite_atlas.png
 
 - Category: Rejected multi-category gameplay atlas
@@ -153,6 +186,39 @@
 - Prompt summary: Quiet top-down gunmetal alien weapon capsule with cut corners and a pale blue-white slot
 - Replacement priority: High before commercial release
 - Gameplay notes: Configured at 32×22. It stays visible against the arena while remaining much quieter than the Red Box. Weapon category and collection behavior remain data-driven.
+
+## core_silhouette_sheet_v1.png
+
+- Category: Core concept exploration
+- Purpose: Gate 1 silhouette review for the signature Core design
+- Date added: 2026-07-30
+- AI-generated: Yes
+- Status: Experimental
+- Prompt summary: Sixteen strict top-down, solid-black support-module silhouettes exploring asymmetric chassis, stabilizers, clamps, prongs, and negative-space cutouts
+- Replacement priority: Retain as design documentation until the Core direction is approved
+- Gameplay notes: The top-right silhouette was selected as the strongest candidate because its crescent opening, swept rear stabilizers, and clear facing remain distinctive without color or internal detail.
+
+## core_dormant_candidate_v1_chroma.png
+
+- Category: Core source art
+- Purpose: Chroma-key source retained for reproducibility of the Dormant Core candidate
+- Date added: 2026-07-30
+- AI-generated: Yes
+- Status: Experimental
+- Prompt summary: Finished Dormant Core constrained to the selected crescent-jaw silhouette on a flat green removal background
+- Replacement priority: Remove after the transparent derivative and visual direction are approved
+- Gameplay notes: Source only; do not load this file in Phaser.
+
+## core_dormant_candidate_v1.png
+
+- Category: Core
+- Purpose: First Dormant Core visual candidate derived from the approved silhouette exploration
+- Date added: 2026-07-30
+- AI-generated: Yes
+- Status: Accepted temporary
+- Prompt summary: Strict overhead crescent-chassis support module with swept stabilizers, dark gunmetal armor, and one controlled cyan energy aperture
+- Replacement priority: Critical before commercial release until approved
+- Gameplay notes: Transparency validated and integrated through the shared Core visual controller. The gameplay follower uses a 24×29 display box, trails below-left of the Hunter, and has restrained bob, sway, and cyan glow. Hunter Bay and inventory panels use a 42×50 display box. Feed and evolution events pulse the same sprite; evolution temporarily intensifies the glow and emits eight controlled cyan particles. Live crowd readability and final scale tuning remain manual.
 
 ## red_box_temp_v1_gameplay.png
 

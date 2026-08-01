@@ -7,11 +7,50 @@ export type ItemRarity =
   | 'uncommon'
   | 'rare'
 
-export type WeaponAffix =
+export type WeaponPrefix =
   | 'heavy'
   | 'rapid'
   | 'deadeye'
   | 'brutal'
+  | 'marksman'
+  | 'longshot'
+  | 'wideBore'
+  | 'crowdbreaker'
+  | 'reinforcedStock'
+  | 'siege'
+  | 'impact'
+  | 'overcharged'
+  | 'focused'
+  | 'conductive'
+  | 'executioner'
+
+export type WeaponSuffix =
+  | 'precision'
+  | 'alignment'
+  | 'fury'
+  | 'breach'
+  | 'impact'
+  | 'ruin'
+  | 'conductivity'
+  | 'resonance'
+  | 'blood'
+  | 'mastery'
+
+export type WeaponAffix =
+  WeaponPrefix
+
+export interface WeaponModifiers {
+  additionalPierce?: number
+  projectileRangeMultiplier?: number
+  additionalPellets?: number
+  finisherSpreadMultiplier?: number
+  recoilMultiplier?: number
+  explosionRadiusMultiplier?: number
+  knockbackMultiplier?: number
+  additionalChains?: number
+  chainRangeMultiplier?: number
+  sweetSpotMultiplier?: number
+}
 
 export interface BaseItem {
   id: string
@@ -40,4 +79,13 @@ export interface WeaponItem
 
   affix?:
     WeaponAffix
+
+  prefix?:
+    WeaponPrefix
+
+  suffix?:
+    WeaponSuffix
+
+  modifiers?:
+    WeaponModifiers
 }

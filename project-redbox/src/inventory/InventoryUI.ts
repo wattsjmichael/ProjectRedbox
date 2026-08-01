@@ -17,6 +17,10 @@ import {
   CoreVisual,
 } from '../core/CoreVisual'
 
+import {
+  getWeaponAffixDescriptions,
+} from '../items/WeaponAffixes'
+
 interface InventoryUIConfig {
   scene:
     Phaser.Scene
@@ -1032,8 +1036,16 @@ export class InventoryUI {
         const difference =
           selected -
           equippedValue
+        const threshold =
+          Math.max(Math.abs(equippedValue) * 0.04, 0.01)
+        const indicator =
+          difference > threshold
+            ? '▲ BETTER'
+            : difference < -threshold
+              ? '▼ WORSE'
+              : '≈ SIMILAR'
 
-        return `  ${difference >= 0 ? '+' : ''}${difference.toFixed(2)}`
+        return `  ${indicator}`
       }
 
     const name =
@@ -1077,7 +1089,7 @@ export class InventoryUI {
         .text(
           570,
           315,
-          `${item.weaponType.toUpperCase()}  //  AFFIX ${item.affix?.toUpperCase() ?? 'NONE'}`,
+          `${item.weaponType.toUpperCase()}  //  ${getWeaponAffixDescriptions(item).join('\n') || 'NO AFFIXES'}`,
           {
             fontFamily:
               'Arial',
@@ -1094,7 +1106,7 @@ export class InventoryUI {
       this.scene.add
         .text(
           570,
-          365,
+          395,
           [
             `ATTACK          ${item.attack}${comparison(item.attack, equipped?.attack)}`,
             `SPEED           ${item.speed}${comparison(item.speed, equipped?.speed)}`,

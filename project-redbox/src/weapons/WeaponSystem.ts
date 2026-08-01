@@ -284,6 +284,9 @@ this.getCoreEnergyMultiplier =
   }
 
   private setupAttackInput() {
+    this.scene.input.mouse
+      ?.disableContextMenu()
+
     this.scene.input.on(
       'pointerdown',
       (
@@ -291,7 +294,8 @@ this.getCoreEnergyMultiplier =
           Phaser.Input.Pointer
       ) => {
         if (
-          !this.enabled
+          !this.enabled ||
+          pointer.button !== 0
         ) {
           return
         }
@@ -473,8 +477,16 @@ update(
         ].finisher ===
           'timedMelee'
           ? Math.min(
-            420 /
-            this.getSpeedMultiplier(),
+            timing.earliestNextInput +
+            (
+              420 /
+              this.getSpeedMultiplier() -
+              timing.earliestNextInput
+            ) *
+            this.getWeaponModifier(
+              'sweetSpotMultiplier',
+              1
+            ),
             timing.latestComboInput
           )
           : timing.latestComboInput,
@@ -623,8 +635,19 @@ update(
         this.getCurrentTiming()
           .earliestNextInput &&
       this.comboTimer <=
-        420 /
-        this.getSpeedMultiplier()
+        Math.min(
+          this.getCurrentTiming().earliestNextInput +
+          (
+            420 /
+            this.getSpeedMultiplier() -
+            this.getCurrentTiming().earliestNextInput
+          ) *
+          this.getWeaponModifier(
+            'sweetSpotMultiplier',
+            1
+          ),
+          this.getCurrentTiming().latestComboInput
+        )
 
     this.performComboAttack(
       this.comboStep + 1,
@@ -1117,9 +1140,26 @@ update(
             behavior
               .finisherMaxHits,
           maxRange:
-            behavior.maxRange,
+            (behavior.maxRange ?? 1200) *
+            this.getWeaponModifier(
+              'projectileRangeMultiplier',
+              1
+            ),
         }
-        : undefined
+        : {
+          maxHits:
+            (behavior.maxHits ?? 1) +
+            this.getWeaponModifier(
+              'additionalPierce',
+              0
+            ),
+          maxRange:
+            (behavior.maxRange ?? 1200) *
+            this.getWeaponModifier(
+              'projectileRangeMultiplier',
+              1
+            ),
+        }
     )
 
     this.createMuzzleFlash(
@@ -1155,11 +1195,27 @@ update(
       behavior.comboCounts?.[
         comboStep - 1
       ] ?? 5
+    const modifiedPelletCount =
+      pelletCount +
+      this.getWeaponModifier(
+        'additionalPellets',
+        0
+      )
 
     const spread =
       behavior.comboSpreads?.[
         comboStep - 1
       ] ?? 0.35
+    const modifiedSpread =
+      spread *
+      (
+        comboStep === 3
+          ? this.getWeaponModifier(
+              'finisherSpreadMultiplier',
+              1
+            )
+          : 1
+      )
 
     const multiplier =
       this.getComboDamageMultiplier(
@@ -1168,7 +1224,7 @@ update(
 
     for (
       let i = 0;
-      i < pelletCount;
+      i < modifiedPelletCount;
       i++
     ) {
       const pelletDirection =
@@ -1176,8 +1232,8 @@ update(
           .clone()
           .rotate(
             Phaser.Math.FloatBetween(
-              -spread,
-              spread
+              -modifiedSpread,
+              modifiedSpread
             )
           )
 
@@ -1194,8 +1250,11 @@ update(
         comboStep === 3
           ? {
             knockback:
-              behavior
-                .finisherKnockback,
+              (behavior.finisherKnockback ?? 0) *
+              this.getWeaponModifier(
+                'knockbackMultiplier',
+                1
+              ),
           }
           : undefined
       )
@@ -1209,7 +1268,12 @@ update(
 
     if (comboStep === 3) {
       this.playPlayerRecoil(
-        1.14
+        1 +
+        0.14 *
+        this.getWeaponModifier(
+          'recoilMultiplier',
+          1
+        )
       )
     }
 
@@ -1247,6 +1311,12 @@ update(
         ? {
           explode:
             true,
+          knockback:
+            32 *
+            this.getWeaponModifier(
+              'knockbackMultiplier',
+              1
+            ),
         }
         : undefined
     )
@@ -1295,11 +1365,19 @@ update(
             behavior
               .finisherMaxHits,
           chainCount:
-            behavior.chainCount,
+            (behavior.chainCount ?? 0) +
+            this.getWeaponModifier(
+              'additionalChains',
+              0
+            ),
         }
         : {
           maxHits:
-            behavior.maxHits,
+            (behavior.maxHits ?? 1) +
+            this.getWeaponModifier(
+              'additionalPierce',
+              0
+            ),
         }
     )
 
@@ -1844,12 +1922,18 @@ update(
         .cannon.behavior
         .explosionRadius ??
       105
+    const modifiedRadius =
+      radius *
+      this.getWeaponModifier(
+        'explosionRadiusMultiplier',
+        1
+      )
 
     const explosion =
       this.scene.add.circle(
         x,
         y,
-        radius,
+        modifiedRadius,
         0xff4444,
         0.25
       )
@@ -1898,7 +1982,7 @@ update(
 
       if (
         distance >
-        radius
+        modifiedRadius
       ) {
         continue
       }
@@ -2001,9 +2085,13 @@ update(
               (
                 WEAPON_COMBO_TIMINGS
                   .photonLance
-                  .behavior
+                .behavior
                   .chainRange ??
                 230
+              ) *
+              this.getWeaponModifier(
+                'chainRangeMultiplier',
+                1
               )
           )
           .sort(
@@ -2312,6 +2400,14 @@ private calculateDamage(
         base.finisherRecovery /
         speed,
     }
+  }
+
+  private getWeaponModifier(
+    key: keyof NonNullable<WeaponItem['modifiers']>,
+    fallback: number
+  ) {
+    return this.equippedWeapon
+      ?.modifiers?.[key] ?? fallback
   }
 
   private getComboDamageMultiplier(

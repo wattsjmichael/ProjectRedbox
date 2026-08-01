@@ -4,6 +4,10 @@ import {
   GAMEPLAY_TEXTURES,
 } from '../assets/GameplayArt'
 
+import {
+  WASTES_TEXTURES,
+} from '../assets/WastesArt'
+
 export class BootScene
   extends Phaser.Scene {
   constructor() {
@@ -27,9 +31,10 @@ export class BootScene
 
     for (
       const texture of
-      Object.values(
-        GAMEPLAY_TEXTURES
-      )
+      [
+        ...Object.values(GAMEPLAY_TEXTURES),
+        ...Object.values(WASTES_TEXTURES),
+      ]
     ) {
       this.load.image(
         texture.key,

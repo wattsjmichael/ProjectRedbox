@@ -13,6 +13,10 @@ import {
 } from '../items/ItemGenerator'
 
 import {
+  getWeaponAffixDescriptions,
+} from '../items/WeaponAffixes'
+
+import {
   CoreSystem,
 } from '../core/CoreSystem'
 
@@ -869,7 +873,7 @@ export class HunterBayScene
     this.add.text(
       630,
       271,
-      `${item.rarity.toUpperCase()} ${item.weaponType.toUpperCase()}  //  AFFIX: ${item.affix?.toUpperCase() ?? 'NONE'}`,
+      `${item.rarity.toUpperCase()} ${item.weaponType.toUpperCase()}\n${getWeaponAffixDescriptions(item).join('\n') || 'NO AFFIXES'}`,
       {
         fontFamily:
           'Arial',
@@ -887,7 +891,7 @@ export class HunterBayScene
 
     this.add.text(
       630,
-      310,
+      335,
       `SELECTED                 EQUIPPED: ${equippedLabel}`,
       {
         fontFamily:
@@ -901,7 +905,7 @@ export class HunterBayScene
 
     this.add.text(
       630,
-      344,
+      370,
       [
         this.getComparisonLine(
           'ATTACK',
@@ -1145,10 +1149,18 @@ export class HunterBayScene
       equipped === undefined
         ? ''
         : selected - equipped
+    const threshold =
+      equipped === undefined
+        ? 0
+        : Math.max(Math.abs(equipped) * 0.04, 0.01)
     const deltaText =
       delta === ''
         ? ''
-        : `  (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`
+        : delta > threshold
+          ? '  ▲ BETTER'
+          : delta < -threshold
+            ? '  ▼ WORSE'
+            : '  ≈ SIMILAR'
 
     return `${label.padEnd(12)} ${selectedText.padStart(7)}${deltaText}`
   }

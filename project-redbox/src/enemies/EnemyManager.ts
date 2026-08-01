@@ -32,6 +32,12 @@ interface EnemyManagerConfig {
       amount: number
     ) => void
 
+  canDamagePlayerFrom?:
+    (
+      x: number,
+      y: number
+    ) => boolean
+
   scaling:
     DropScaling
 }
@@ -70,6 +76,11 @@ export class EnemyManager {
   private onPlayerDamage:
     EnemyManagerConfig['onPlayerDamage']
 
+  private canDamagePlayerFrom:
+    NonNullable<
+      EnemyManagerConfig['canDamagePlayerFrom']
+    >
+
   private scaling:
     DropScaling
 
@@ -100,6 +111,10 @@ export class EnemyManager {
 
     this.onPlayerDamage =
       config.onPlayerDamage
+
+    this.canDamagePlayerFrom =
+      config.canDamagePlayerFrom ??
+      (() => true)
 
     this.scaling =
       config.scaling
@@ -141,6 +156,15 @@ export class EnemyManager {
       this.enemyTypes.get(
         enemy
       ) ?? EnemyTypes.Basic
+    )
+  }
+
+  syncEnemyVisualPosition(
+    enemy:
+      Phaser.GameObjects.Rectangle
+  ) {
+    this.syncEnemyVisual(
+      enemy
     )
   }
 
@@ -986,7 +1010,11 @@ export class EnemyManager {
         enemy.y,
         this.player.x,
         this.player.y
-      ) <= radius
+      ) <= radius &&
+      this.canDamagePlayerFrom(
+        enemy.x,
+        enemy.y
+      )
     ) {
       this.damagePlayerFrom(
         EnemyTypes.Tank
