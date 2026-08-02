@@ -55,6 +55,39 @@ interface SaveFile extends PersistentGameData {
   version: 4
 }
 
+export interface HunterProfileSummary {
+  id: string
+  name: string
+  createdAt: number
+  updatedAt: number
+  hunterLevel: number
+  equippedWeaponName: string
+  equippedArmorName: string
+  coreLevel: number
+  coreStage: CoreStage
+  completedDrops: number
+  unavailable?: boolean
+}
+
+export interface HunterProfile {
+  id: string
+  name: string
+  createdAt: number
+  updatedAt: number
+  saveData: PersistentGameData
+}
+
+interface StoredHunterProfile
+  extends Omit<HunterProfile, 'saveData'> {
+  version: 1
+  saveData: SaveFile
+}
+
+interface ProfileIndex {
+  version: 1
+  profiles: HunterProfileSummary[]
+}
+
 interface LegacyVersionThreeSave
   extends Omit<
     PersistentGameData,
@@ -113,167 +146,61 @@ export function createDefaultTutorialState():
 }
 
 export class PersistenceSystem {
-  private static readonly storageKey =
+  private static readonly legacyStorageKey =
     'project-redbox-save'
 
+  private static readonly profileIndexKey =
+    'project-redbox.profiles'
+
+  private static readonly profileKeyPrefix =
+    'project-redbox.profile.'
+
+  private static readonly activeProfileKey =
+    'project-redbox.activeProfileId'
+
+  private static readonly legacyMigrationKey =
+    'project-redbox.legacyMigrated'
+
   load(): PersistentGameData | null {
-    try {
-      const raw =
-        window.localStorage.getItem(
-          PersistenceSystem.storageKey
-        )
-
-      if (!raw) {
-        return null
-      }
-
-      const parsed: unknown =
-        JSON.parse(raw)
-
-      if (
-        this.isLegacyVersionOneSave(
-          parsed
-        )
-      ) {
-        return this.persistMigration({
-          inventory:
-            parsed.inventory,
-          equippedWeapon:
-            parsed.equippedWeapon,
-          core:
-            this.migrateLegacyCore(
-              parsed.mag
-            ),
-          player:
-            parsed.player,
-          account:
-            createDefaultAccount(),
-          tutorial:
-            createDefaultTutorialState(),
-        })
-      }
-
-      if (
-        this.isLegacyVersionTwoSave(
-          parsed
-        )
-      ) {
-        return this.persistMigration({
-          inventory:
-            parsed.inventory,
-          equippedWeapon:
-            parsed.equippedWeapon,
-          core:
-            this.migrateLegacyCore(
-              parsed.mag
-            ),
-          player:
-            parsed.player,
-          account:
-            parsed.account,
-          tutorial:
-            createDefaultTutorialState(),
-        })
-      }
-
-      if (
-        this.isLegacyVersionThreeSave(
-          parsed
-        )
-      ) {
-        return this.persistMigration({
-          inventory:
-            parsed.inventory,
-          equippedWeapon:
-            parsed.equippedWeapon,
-          core:
-            this.migrateLegacyCore(
-              parsed.mag
-            ),
-          player:
-            parsed.player,
-          account:
-            parsed.account,
-          tutorial:
-            parsed.tutorial,
-        })
-      }
-
-      if (
-        this.isRecord(parsed) &&
-        parsed.version === 4 &&
-        this.hasValidCurrentData(
-          parsed
-        ) &&
-        !this.isCore(
-          parsed.core
-        ) &&
-        this.isLegacyCore(
-          parsed.core
-        )
-      ) {
-        return this.persistMigration({
-          inventory:
-            parsed.inventory as
-              WeaponItem[],
-          equippedWeapon:
-            parsed.equippedWeapon as
-              WeaponItem | null,
-          core:
-            this.migrateLegacyCore(
-              parsed.core
-            ),
-          player:
-            parsed.player as
-              PersistentPlayerProgression,
-          account:
-            parsed.account as
-              AccountProgression,
-          tutorial:
-            parsed.tutorial as
-              TutorialSaveState,
-        })
-      }
-
-      if (!this.isSaveFile(parsed)) {
-        console.warn(
-          'Invalid Project Redbox save; using fresh data.'
-        )
-        return null
-      }
-
-      return this.removeTestWeapons(
-        parsed
-      )
-    } catch (error) {
-      console.warn(
-        'Could not load Project Redbox save; using fresh data.',
-        error
-      )
-      return null
-    }
+    const activeId = this.getActiveProfileId()
+    return activeId
+      ? this.loadProfile(activeId)?.saveData ?? null
+      : null
   }
 
   save(data: PersistentGameData) {
-    const saveFile: SaveFile = {
-      version: 4,
-      ...this.clone(data),
+    const activeId = this.getActiveProfileId()
+
+    if (!activeId) {
+      console.warn('Could not save Hunter: no active profile.')
+      return false
     }
 
-    try {
-      window.localStorage.setItem(
-        PersistenceSystem.storageKey,
-        JSON.stringify(saveFile)
-      )
-    } catch (error) {
-      console.warn(
-        'Could not write Project Redbox save.',
-        error
-      )
+    const profile = this.loadProfile(activeId)
+    if (!profile) {
+      console.warn(`Could not save Hunter: profile ${activeId} is unavailable.`)
+      return false
     }
+
+    return this.writeProfile({
+      ...profile,
+      updatedAt: Date.now(),
+      saveData: {
+        ...this.clone(data),
+        account: {
+          ...data.account,
+          hunterName: profile.name,
+          lifetimeStats: {
+            ...data.account.lifetimeStats,
+          },
+        },
+      },
+    })
   }
 
-  createFreshSave():
+  createFreshSave(
+    hunterName = 'HUNTER'
+  ):
     PersistentGameData {
     const inventory:
       WeaponItem[] = []
@@ -302,28 +229,429 @@ export class PersistenceSystem {
         speed:
           player.speed,
       },
-      account:
-        createDefaultAccount(),
+      account: {
+        ...createDefaultAccount(),
+        hunterName,
+      },
       tutorial:
         createDefaultTutorialState(),
     }
   }
 
   reset() {
+    const activeId = this.getActiveProfileId()
+    return activeId
+      ? this.resetProfile(activeId)
+      : false
+  }
+
+  initializeProfiles() {
+    const profiles = this.listProfiles()
+
     try {
-      window.localStorage.removeItem(
-        PersistenceSystem.storageKey
+      if (
+        window.localStorage.getItem(
+          PersistenceSystem.legacyMigrationKey
+        ) === 'complete'
+      ) {
+        return profiles
+      }
+
+      const legacyRaw = window.localStorage.getItem(
+        PersistenceSystem.legacyStorageKey
       )
 
+      if (!legacyRaw) {
+        window.localStorage.setItem(
+          PersistenceSystem.legacyMigrationKey,
+          'complete'
+        )
+        return profiles
+      }
+
+      const legacy = this.parseRawSave(legacyRaw)
+      if (!legacy) {
+        console.warn('Legacy save could not be migrated; recovery copy was preserved.')
+        return profiles
+      }
+
+      const preferredName = legacy.account.hunterName.trim()
+      const name =
+        preferredName && preferredName !== 'RED HUNTER'
+          ? this.normalizeHunterName(preferredName.slice(0, 16)) ?? 'Legacy Hunter'
+          : 'Legacy Hunter'
+      const created = this.createProfile(name, legacy)
+
+      if (!created || !this.loadProfile(created.id)) {
+        console.warn('Legacy profile write could not be verified; migration will retry later.')
+        return this.listProfiles()
+      }
+
+      window.localStorage.setItem(
+        PersistenceSystem.legacyMigrationKey,
+        'complete'
+      )
+      return this.listProfiles()
+    } catch (error) {
+      console.warn('Hunter profile migration could not access local storage.', error)
+      return profiles
+    }
+  }
+
+  listProfiles(): HunterProfileSummary[] {
+    const index = this.readProfileIndex()
+
+    return index.profiles.map(summary => ({
+      ...summary,
+      unavailable: this.loadStoredProfile(summary.id) === null,
+    }))
+  }
+
+  createProfile(
+    rawName: string,
+    initialData?: PersistentGameData
+  ): HunterProfileSummary | null {
+    const name = this.normalizeHunterName(rawName)
+    if (!name) return null
+
+    const now = Date.now()
+    const id = this.generateProfileId()
+    const source = initialData ?? this.createFreshSave(name)
+    const saveData = this.clone({
+      ...source,
+      account: {
+        ...source.account,
+        hunterName: name,
+        lifetimeStats: {
+          ...source.account.lifetimeStats,
+        },
+      },
+    })
+    const profile: HunterProfile = {
+      id,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      saveData,
+    }
+
+    if (!this.writeProfile(profile)) return null
+    this.setActiveProfile(id)
+    return this.buildSummary(profile)
+  }
+
+  loadProfile(id: string): HunterProfile | null {
+    const stored = this.loadStoredProfile(id)
+    if (!stored) return null
+
+    return {
+      id: stored.id,
+      name: stored.name,
+      createdAt: stored.createdAt,
+      updatedAt: stored.updatedAt,
+      saveData: this.clone(stored.saveData),
+    }
+  }
+
+  setActiveProfile(id: string) {
+    if (!this.loadStoredProfile(id)) return false
+
+    try {
+      window.localStorage.setItem(
+        PersistenceSystem.activeProfileKey,
+        id
+      )
       return true
     } catch (error) {
-      console.warn(
-        'Could not reset Project Redbox save.',
-        error
-      )
-
+      console.warn('Could not select Hunter profile.', error)
       return false
     }
+  }
+
+  getActiveProfileId() {
+    try {
+      return window.localStorage.getItem(
+        PersistenceSystem.activeProfileKey
+      )
+    } catch (error) {
+      console.warn('Could not read the active Hunter profile.', error)
+      return null
+    }
+  }
+
+  deleteProfile(id: string) {
+    try {
+      window.localStorage.removeItem(this.getProfileKey(id))
+      const index = this.readProfileIndex()
+      index.profiles = index.profiles.filter(profile => profile.id !== id)
+      if (!this.writeProfileIndex(index)) return false
+
+      if (this.getActiveProfileId() === id) {
+        window.localStorage.removeItem(PersistenceSystem.activeProfileKey)
+      }
+      return true
+    } catch (error) {
+      console.warn(`Could not delete Hunter profile ${id}.`, error)
+      return false
+    }
+  }
+
+  resetProfile(id: string) {
+    const profile = this.loadProfile(id)
+    if (!profile) return false
+
+    return this.writeProfile({
+      ...profile,
+      updatedAt: Date.now(),
+      saveData: this.createFreshSave(profile.name),
+    })
+  }
+
+  normalizeHunterName(rawName: string) {
+    const name = rawName.trim()
+    return (
+      name.length >= 1 &&
+      name.length <= 16 &&
+      /^[A-Za-z0-9 '\-]+$/.test(name)
+    )
+      ? name
+      : null
+  }
+
+  private writeProfile(profile: HunterProfile) {
+    const saveFile: SaveFile = {
+      version: 4,
+      ...this.clone(profile.saveData),
+    }
+    const stored: StoredHunterProfile = {
+      version: 1,
+      id: profile.id,
+      name: profile.name,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      saveData: saveFile,
+    }
+
+    try {
+      window.localStorage.setItem(
+        this.getProfileKey(profile.id),
+        JSON.stringify(stored)
+      )
+      const index = this.readProfileIndex()
+      const summary = this.buildSummary(profile)
+      const existing = index.profiles.findIndex(entry => entry.id === profile.id)
+      if (existing >= 0) index.profiles[existing] = summary
+      else index.profiles.push(summary)
+      return this.writeProfileIndex(index)
+    } catch (error) {
+      console.warn(`Could not write Hunter profile ${profile.id}.`, error)
+      return false
+    }
+  }
+
+  private loadStoredProfile(id: string): StoredHunterProfile | null {
+    try {
+      const raw = window.localStorage.getItem(this.getProfileKey(id))
+      if (!raw) return null
+      const value: unknown = JSON.parse(raw)
+
+      if (
+        !this.isRecord(value) ||
+        value.version !== 1 ||
+        value.id !== id ||
+        typeof value.name !== 'string' ||
+        !this.normalizeHunterName(value.name) ||
+        !this.isNumber(value.createdAt) ||
+        !this.isNumber(value.updatedAt)
+      ) {
+        return null
+      }
+
+      const saveData = this.parseSaveValue(value.saveData)
+      if (!saveData) return null
+
+      return {
+        version: 1,
+        id,
+        name: value.name,
+        createdAt: value.createdAt,
+        updatedAt: value.updatedAt,
+        saveData: {
+          version: 4,
+          ...saveData,
+        },
+      }
+    } catch (error) {
+      console.warn(`Could not load Hunter profile ${id}.`, error)
+      return null
+    }
+  }
+
+  private readProfileIndex(): ProfileIndex {
+    try {
+      const raw = window.localStorage.getItem(PersistenceSystem.profileIndexKey)
+      if (!raw) return this.rebuildProfileIndex()
+      const value: unknown = JSON.parse(raw)
+      if (!this.isProfileIndex(value)) return this.rebuildProfileIndex()
+      return {
+        version: 1,
+        profiles: value.profiles.map(profile => ({ ...profile })),
+      }
+    } catch (error) {
+      console.warn('Profile index is corrupted; rebuilding from profile saves.', error)
+      return this.rebuildProfileIndex()
+    }
+  }
+
+  private rebuildProfileIndex(): ProfileIndex {
+    const profiles: HunterProfileSummary[] = []
+
+    try {
+      for (let index = 0; index < window.localStorage.length; index++) {
+        const key = window.localStorage.key(index)
+        if (!key?.startsWith(PersistenceSystem.profileKeyPrefix)) continue
+        const id = key.slice(PersistenceSystem.profileKeyPrefix.length)
+        const stored = this.loadStoredProfile(id)
+        if (stored) {
+          profiles.push(this.buildSummary({
+            id: stored.id,
+            name: stored.name,
+            createdAt: stored.createdAt,
+            updatedAt: stored.updatedAt,
+            saveData: stored.saveData,
+          }))
+        }
+      }
+    } catch (error) {
+      console.warn('Could not scan local Hunter profiles.', error)
+    }
+
+    const rebuilt: ProfileIndex = { version: 1, profiles }
+    this.writeProfileIndex(rebuilt)
+    return rebuilt
+  }
+
+  private writeProfileIndex(index: ProfileIndex) {
+    try {
+      window.localStorage.setItem(
+        PersistenceSystem.profileIndexKey,
+        JSON.stringify(index)
+      )
+      return true
+    } catch (error) {
+      console.warn('Could not write Hunter profile index.', error)
+      return false
+    }
+  }
+
+  private isProfileIndex(value: unknown): value is ProfileIndex {
+    return (
+      this.isRecord(value) &&
+      value.version === 1 &&
+      Array.isArray(value.profiles) &&
+      value.profiles.every(profile =>
+        this.isRecord(profile) &&
+        typeof profile.id === 'string' &&
+        typeof profile.name === 'string' &&
+        this.isNumber(profile.createdAt) &&
+        this.isNumber(profile.updatedAt) &&
+        this.isInteger(profile.hunterLevel, 1) &&
+        typeof profile.equippedWeaponName === 'string' &&
+        typeof profile.equippedArmorName === 'string' &&
+        this.isInteger(profile.coreLevel, 1) &&
+        [CoreStage.Dormant, CoreStage.Awakened].includes(profile.coreStage as CoreStage) &&
+        this.isInteger(profile.completedDrops, 0)
+      )
+    )
+  }
+
+  private buildSummary(profile: HunterProfile): HunterProfileSummary {
+    return {
+      id: profile.id,
+      name: profile.name,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      hunterLevel: profile.saveData.player.level ?? 1,
+      equippedWeaponName: profile.saveData.equippedWeapon?.name ?? 'None',
+      equippedArmorName: 'None',
+      coreLevel: profile.saveData.core.level,
+      coreStage: profile.saveData.core.stage,
+      completedDrops: profile.saveData.account.lifetimeStats.runs,
+    }
+  }
+
+  private getProfileKey(id: string) {
+    return `${PersistenceSystem.profileKeyPrefix}${id}`
+  }
+
+  private generateProfileId() {
+    return globalThis.crypto?.randomUUID?.() ??
+      `hunter-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  }
+
+  private parseRawSave(raw: string) {
+    try {
+      return this.parseSaveValue(JSON.parse(raw) as unknown)
+    } catch (error) {
+      console.warn('Could not parse Project Redbox save data.', error)
+      return null
+    }
+  }
+
+  private parseSaveValue(value: unknown): PersistentGameData | null {
+    if (this.isLegacyVersionOneSave(value)) {
+      return this.removeTestWeapons({
+        inventory: value.inventory,
+        equippedWeapon: value.equippedWeapon,
+        core: this.migrateLegacyCore(value.mag),
+        player: value.player,
+        account: createDefaultAccount(),
+        tutorial: createDefaultTutorialState(),
+      })
+    }
+
+    if (this.isLegacyVersionTwoSave(value)) {
+      return this.removeTestWeapons({
+        inventory: value.inventory,
+        equippedWeapon: value.equippedWeapon,
+        core: this.migrateLegacyCore(value.mag),
+        player: value.player,
+        account: value.account,
+        tutorial: createDefaultTutorialState(),
+      })
+    }
+
+    if (this.isLegacyVersionThreeSave(value)) {
+      return this.removeTestWeapons({
+        inventory: value.inventory,
+        equippedWeapon: value.equippedWeapon,
+        core: this.migrateLegacyCore(value.mag),
+        player: value.player,
+        account: value.account,
+        tutorial: value.tutorial,
+      })
+    }
+
+    if (
+      this.isRecord(value) &&
+      value.version === 4 &&
+      this.hasValidCurrentData(value) &&
+      !this.isCore(value.core) &&
+      this.isLegacyCore(value.core)
+    ) {
+      return this.removeTestWeapons({
+        inventory: value.inventory as WeaponItem[],
+        equippedWeapon: value.equippedWeapon as WeaponItem | null,
+        core: this.migrateLegacyCore(value.core),
+        player: value.player as PersistentPlayerProgression,
+        account: value.account as AccountProgression,
+        tutorial: value.tutorial as TutorialSaveState,
+      })
+    }
+
+    return this.isSaveFile(value)
+      ? this.removeTestWeapons(value)
+      : null
   }
 
   private clone(
@@ -332,11 +660,21 @@ export class PersistenceSystem {
     return {
       inventory:
         data.inventory.map(
-          item => ({ ...item })
+          item => ({
+            ...item,
+            modifiers: item.modifiers
+              ? { ...item.modifiers }
+              : undefined,
+          })
         ),
       equippedWeapon:
         data.equippedWeapon
-          ? { ...data.equippedWeapon }
+          ? {
+              ...data.equippedWeapon,
+              modifiers: data.equippedWeapon.modifiers
+                ? { ...data.equippedWeapon.modifiers }
+                : undefined,
+            }
           : null,
       core: {
         ...data.core,
@@ -634,24 +972,6 @@ export class PersistenceSystem {
           ? CoreStage.Awakened
           : CoreStage.Dormant,
     }
-  }
-
-  private persistMigration(
-    data:
-      PersistentGameData
-  ) {
-    const migrated =
-      this.removeTestWeapons(
-        data
-      )
-
-    // The legacy record is only superseded
-    // after the current schema writes safely.
-    this.save(
-      migrated
-    )
-
-    return migrated
   }
 
   private isPlayer(

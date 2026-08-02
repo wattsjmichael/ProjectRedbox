@@ -214,17 +214,14 @@ export class GameScene
       this.persistence.load()
 
     if (!this.loadedSave) {
-      this.loadedSave =
-        this.persistence
-          .createFreshSave()
-      this.persistence.save(
-        this.loadedSave
+      this.scene.start(
+        'HunterProfileScene'
       )
+      return
     }
 
     this.account =
-      this.loadedSave?.account ??
-      createDefaultAccount()
+      this.loadedSave.account
 
     this.runScaling =
       DropScalingSystem.calculate(

@@ -16,6 +16,10 @@ import {
   HunterBayScene,
 } from './scenes/HunterBayScene'
 
+import {
+  HunterProfileScene,
+} from './scenes/HunterProfileScene'
+
 const config:
   Phaser.Types.Core.GameConfig = {
   type:
@@ -41,6 +45,7 @@ const config:
   scene: [
     BootScene,
     TitleScene,
+    HunterProfileScene,
     GameScene,
     HunterBayScene,
   ],

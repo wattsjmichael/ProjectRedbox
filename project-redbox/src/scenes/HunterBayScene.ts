@@ -99,7 +99,7 @@ export class HunterBayScene
 
     if (!saveData) {
       this.scene.start(
-        'TitleScene'
+        'HunterProfileScene'
       )
       return
     }
