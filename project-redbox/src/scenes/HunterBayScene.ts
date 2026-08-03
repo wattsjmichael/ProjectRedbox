@@ -161,7 +161,6 @@ export class HunterBayScene
 
     this.render()
     this.setupCoreDebugControl()
-    this.setupArmorDebugControl()
 
     if (
       !this.saveData.tutorial
@@ -494,6 +493,7 @@ export class HunterBayScene
           7,
       }
     )
+
   }
 
   private createRecentFinds() {
@@ -668,6 +668,39 @@ export class HunterBayScene
           '#ffffff',
       }
     )
+
+    if (import.meta.env.DEV) {
+      const armorDebugButton = this.add.text(
+        600,
+        220,
+        '[ DEV: ADD TEST ARMOR ]',
+        {
+          fontFamily:
+            'Arial Black, Arial',
+          fontSize:
+            '11px',
+          color:
+            '#66d9ff',
+        }
+      )
+        .setOrigin(1, 0.5)
+        .setInteractive({ useHandCursor: true })
+
+      armorDebugButton.on('pointerover', () => {
+        armorDebugButton.setColor('#ffffff')
+      })
+      armorDebugButton.on('pointerout', () => {
+        armorDebugButton.setColor('#66d9ff')
+      })
+      armorDebugButton.on(
+        'pointerdown',
+        (pointer: Phaser.Input.Pointer) => {
+          if (pointer.leftButtonDown()) {
+            this.addDevelopmentArmor()
+          }
+        }
+      )
+    }
 
     const visible =
       items.slice(
@@ -1551,36 +1584,19 @@ export class HunterBayScene
     )
   }
 
-  private setupArmorDebugControl() {
-    if (!import.meta.env.DEV || !this.input.keyboard) return
-
-    const handler = (event: KeyboardEvent) => {
-      if (
-        event.code !== 'KeyA' ||
-        !event.shiftKey ||
-        !event.ctrlKey
-      ) {
-        return
+  private addDevelopmentArmor() {
+    let added = 0
+    for (const armor of createDevelopmentArmorItems()) {
+      if (!this.inventory.getItem(armor.id) && this.inventory.addItem(armor)) {
+        added++
       }
-
-      let added = 0
-      for (const armor of createDevelopmentArmorItems()) {
-        if (!this.inventory.getItem(armor.id) && this.inventory.addItem(armor)) {
-          added++
-        }
-      }
-
-      this.statusMessage = added > 0
-        ? `DEV ARMOR ADDED // ${added} TEST SUITS`
-        : 'DEV ARMOR ALREADY PRESENT OR INVENTORY FULL'
-      this.save()
-      this.render()
     }
 
-    this.input.keyboard.on('keydown', handler)
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.input.keyboard?.off('keydown', handler)
-    })
+    this.statusMessage = added > 0
+      ? `DEV ARMOR ADDED // ${added} TEST SUITS`
+      : 'DEV ARMOR ALREADY PRESENT OR INVENTORY FULL'
+    this.save()
+    this.render()
   }
 
   private createActionButton(
