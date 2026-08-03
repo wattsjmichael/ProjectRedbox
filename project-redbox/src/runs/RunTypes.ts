@@ -1,5 +1,5 @@
 import type {
-  WeaponItem,
+  InventoryItem,
 } from '../items/ItemTypes'
 
 export type RunOutcome =
@@ -12,5 +12,14 @@ export interface RunSummary {
   bossesDefeated: number
   rareDrops: number
   timeMs: number
-  recentFinds: WeaponItem[]
+  recentFinds: InventoryItem[]
+  hunterProgress: {
+    xpGained: number
+    previousLevel: number
+    newLevel: number
+    previousXP: number
+    currentXP: number
+    xpToNextLevel: number
+    rewardLevels: number[]
+  }
 }

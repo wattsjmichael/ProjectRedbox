@@ -44,6 +44,9 @@ interface LootSystemConfig {
 
   getPickupRadiusMultiplier:
     () => number
+
+  getRareDropChanceMultiplier?:
+    () => number
 }
 
 export class LootSystem {
@@ -67,6 +70,9 @@ export class LootSystem {
       'getPickupRadiusMultiplier'
     ]
 
+  private getRareDropChanceMultiplier:
+    () => number
+
   constructor(
     config:
       LootSystemConfig
@@ -85,6 +91,10 @@ export class LootSystem {
 
     this.getPickupRadiusMultiplier =
       config.getPickupRadiusMultiplier
+
+    this.getRareDropChanceMultiplier =
+      config.getRareDropChanceMultiplier ??
+      (() => 1)
   }
 
   update() {
@@ -106,7 +116,8 @@ export class LootSystem {
 
     if (
       roll <
-      LOOT_DROP_RATES.redBox
+      LOOT_DROP_RATES.redBox *
+      this.getRareDropChanceMultiplier()
     ) {
       this.spawnRedBox(
         x,
@@ -118,7 +129,8 @@ export class LootSystem {
 
     if (
       roll <
-      LOOT_DROP_RATES.redBox +
+      LOOT_DROP_RATES.redBox *
+      this.getRareDropChanceMultiplier() +
       LOOT_DROP_RATES.weapon
     ) {
       const weaponType =

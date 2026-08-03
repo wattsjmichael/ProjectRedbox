@@ -1,9 +1,17 @@
 import Phaser from 'phaser'
 
 import type {
+  ArmorItem,
+  InventoryItem,
   WeaponItem,
   ItemRarity,
 } from '../items/ItemTypes'
+import {
+  isArmorItem,
+} from '../items/ItemTypes'
+import {
+  getArmorModifiers,
+} from '../items/ArmorTypes'
 
 import {
   InventorySystem,
@@ -46,16 +54,25 @@ interface InventoryUIConfig {
         number
     }
 
+  getCoreFeedBonusPercent:
+    () => number
+
   onEquip:
     (
       item:
         WeaponItem
     ) => void
 
+  onEquipArmor:
+    (
+      item:
+        ArmorItem
+    ) => void
+
   onFeed:
     (
       item:
-        WeaponItem
+        InventoryItem
     ) => boolean
 
   onClose:
@@ -79,11 +96,17 @@ export class InventoryUI {
   private getHunterStats:
     InventoryUIConfig['getHunterStats']
 
+  private getCoreFeedBonusPercent:
+    InventoryUIConfig['getCoreFeedBonusPercent']
+
   private onEquip:
     InventoryUIConfig['onEquip']
 
   private onFeed:
     InventoryUIConfig['onFeed']
+
+  private onEquipArmor:
+    InventoryUIConfig['onEquipArmor']
 
   private onClose:
     InventoryUIConfig['onClose']
@@ -92,7 +115,7 @@ export class InventoryUI {
     Phaser.GameObjects.Container
 
   private selectedItem:
-    WeaponItem | null =
+    InventoryItem | null =
     null
 
   private visible =
@@ -120,8 +143,14 @@ export class InventoryUI {
     this.getHunterStats =
       config.getHunterStats
 
+    this.getCoreFeedBonusPercent =
+      config.getCoreFeedBonusPercent
+
     this.onEquip =
       config.onEquip
+
+    this.onEquipArmor =
+      config.onEquipArmor
 
     this.onFeed =
       config.onFeed
@@ -818,7 +847,7 @@ export class InventoryUI {
 
   private createPageControls(
     items:
-      WeaponItem[],
+      InventoryItem[],
 
     totalPages:
       number
@@ -1014,6 +1043,14 @@ export class InventoryUI {
       this.getRarityColor(
         item.rarity
       )
+
+    if (isArmorItem(item)) {
+      this.createArmorStatsPanel(
+        item,
+        rarityColor
+      )
+      return
+    }
 
     const equipped =
       this.inventory
@@ -1317,7 +1354,8 @@ export class InventoryUI {
 
     const preview =
       this.core.previewFeed(
-        item
+        item,
+        this.getCoreFeedBonusPercent()
       )
     const feedPreview =
       this.scene.add.text(
@@ -1442,6 +1480,86 @@ export class InventoryUI {
       feedButton,
       feedText,
     ])
+  }
+
+  private createArmorStatsPanel(
+    item: ArmorItem,
+    rarityColor: string
+  ) {
+    const equipped = this.inventory.getEquippedArmor()
+    const selectedStats = getArmorModifiers(item)
+    const equippedStats = equipped ? getArmorModifiers(equipped) : null
+    const compare = (selected: number, current: number | undefined) => {
+      if (current === undefined) return ''
+      if (selected > current) return '  ▲ BETTER'
+      if (selected < current) return '  ▼ WORSE'
+      return '  ≈ SIMILAR'
+    }
+
+    const name = this.scene.add.text(570, 245, item.name.toUpperCase(), {
+      fontFamily: 'Arial Black, Arial', fontSize: '28px', color: rarityColor,
+    })
+    const rarity = this.scene.add.text(570, 285,
+      `${item.rarity.toUpperCase()} // ARMOR // ${item.armorType.toUpperCase()}`,
+      { fontFamily: 'Arial', fontSize: '14px', color: rarityColor }
+    )
+    const affixes = this.scene.add.text(570, 315,
+      item.affixes.map(affix => `${affix.displayName}: ${affix.description}`).join('\n') || 'NO AFFIXES',
+      { fontFamily: 'Arial', fontSize: '15px', color: '#999999' }
+    )
+    const stats = this.scene.add.text(570, 385, [
+      `DEFENSE         ${selectedStats.defense}${compare(selectedStats.defense, equippedStats?.defense)}`,
+      `MAX HEALTH      +${selectedStats.maxHealth}${compare(selectedStats.maxHealth, equippedStats?.maxHealth)}`,
+      `MOVE SPEED      +${(selectedStats.moveSpeedPercent * 100).toFixed(0)}%${compare(selectedStats.moveSpeedPercent, equippedStats?.moveSpeedPercent)}`,
+      `PICKUP RADIUS   +${(selectedStats.pickupRadiusPercent * 100).toFixed(0)}%${compare(selectedStats.pickupRadiusPercent, equippedStats?.pickupRadiusPercent)}`,
+      `CORE FEED       +${(selectedStats.coreFeedBonusPercent * 100).toFixed(0)}%${compare(selectedStats.coreFeedBonusPercent, equippedStats?.coreFeedBonusPercent)}`,
+    ].join('\n\n'), {
+      fontFamily: 'Arial', fontSize: '16px', color: '#ffffff',
+    })
+
+    this.container.add([name, rarity, affixes, stats])
+
+    if (this.inventory.isArmorEquipped(item.id)) {
+      const background = this.scene.add.rectangle(850, 610, 360, 56, 0x2a0a0a)
+        .setStrokeStyle(2, 0xe50914)
+      const text = this.scene.add.text(850, 610, 'EQUIPPED ARMOR', {
+        fontFamily: 'Arial Black, Arial', fontSize: '20px', color: '#e50914',
+      }).setOrigin(0.5)
+      this.container.add([background, text])
+      return
+    }
+
+    const equipButton = this.scene.add.rectangle(850, 575, 360, 52, 0xe50914)
+      .setStrokeStyle(3, 0xffffff).setInteractive({ useHandCursor: true })
+    const equipText = this.scene.add.text(850, 575, 'EQUIP ARMOR', {
+      fontFamily: 'Arial Black, Arial', fontSize: '20px', color: '#ffffff',
+    }).setOrigin(0.5)
+    equipButton.on('pointerdown', () => {
+      const equippedArmor = this.inventory.equipArmor(item.id)
+      if (!equippedArmor) return
+      this.onEquipArmor(equippedArmor)
+      this.selectedItem = equippedArmor
+      this.rebuild()
+    })
+
+    const preview = this.core.previewFeed(item, this.getCoreFeedBonusPercent())
+    const feedPreview = this.scene.add.text(850, 608,
+      `FEED PREVIEW // DEFENSE +${preview.statGained} // PROGRESS +${preview.experienceGained}`,
+      { fontFamily: 'Arial', fontSize: '12px', color: '#cc9966' }
+    ).setOrigin(0.5)
+    const feedButton = this.scene.add.rectangle(850, 640, 360, 52, 0x333333)
+      .setStrokeStyle(2, 0xff4444).setInteractive({ useHandCursor: true })
+    const feedText = this.scene.add.text(850, 640, 'FEED CORE', {
+      fontFamily: 'Arial Black, Arial', fontSize: '18px', color: '#ff4444',
+    }).setOrigin(0.5)
+    feedButton.on('pointerdown', () => {
+      if (!this.onFeed(item)) return
+      const items = this.inventory.getItems()
+      this.selectedItem = items[0] ?? null
+      this.rebuild()
+    })
+
+    this.container.add([equipButton, equipText, feedPreview, feedButton, feedText])
   }
 
   private getRarityColor(

@@ -8,6 +8,11 @@ import type {
   HunterProfileSummary,
 } from '../persistence/PersistenceSystem'
 
+import {
+  getHunterRewardPreview,
+  getNextHunterLevelReward,
+} from '../progression/HunterProgressionConfig'
+
 type ProfileModal =
   | 'create'
   | 'delete'
@@ -96,7 +101,7 @@ export class HunterProfileScene extends Phaser.Scene {
       const selected = profile.id === this.selectedId
       const active = profile.id === this.persistence.getActiveProfileId()
       const card = this.add.rectangle(
-        335, y, 525, 82,
+        335, y, 525, 90,
         selected ? 0x172733 : 0x0d1218,
         0.98
       )
@@ -109,16 +114,22 @@ export class HunterProfileScene extends Phaser.Scene {
         this.render()
       })
 
-      this.add.text(92, y - 24, profile.name.toUpperCase(), {
+      this.add.text(92, y - 34, profile.name.toUpperCase(), {
         fontFamily: 'Arial Black, Arial', fontSize: '20px',
         color: profile.unavailable ? '#ff5a62' : '#ffffff',
       })
-      this.add.text(92, y + 8,
+      this.add.text(92, y - 3,
         profile.unavailable
           ? 'PROFILE DATA UNAVAILABLE'
           : `LEVEL ${profile.hunterLevel}   //   CORE LV ${profile.coreLevel}   //   DROPS ${profile.completedDrops}`,
         { fontFamily: 'Courier New, monospace', fontSize: '13px', color: '#8b99a4' }
       )
+      if (!profile.unavailable) {
+        this.add.text(92, y + 20,
+          `WEAPON ${profile.equippedWeaponName}   //   ARMOR ${profile.equippedArmorName}`,
+          { fontFamily: 'Courier New, monospace', fontSize: '11px', color: '#687681' }
+        )
+      }
       if (active) {
         this.add.text(555, y - 24, 'ACTIVE', {
           fontFamily: 'Arial Black, Arial', fontSize: '11px', color: '#55d8ee',
@@ -179,6 +190,19 @@ export class HunterProfileScene extends Phaser.Scene {
       this.add.text(680, 535, 'This profile cannot be loaded. It has not been overwritten.', {
         fontFamily: 'Arial', fontSize: '14px', color: '#ff7078', wordWrap: { width: 470 },
       })
+    } else {
+      const nextReward = getNextHunterLevelReward(profile.hunterLevel)
+      this.add.text(680, 548,
+        nextReward
+          ? `NEXT LEVEL ${nextReward.level} // ${getHunterRewardPreview(nextReward)}`
+          : 'NEXT REWARD // MORE REWARDS COMING SOON',
+        {
+          fontFamily: 'Courier New, monospace',
+          fontSize: '12px',
+          color: '#55d8ee',
+          wordWrap: { width: 480 },
+        }
+      )
     }
   }
 

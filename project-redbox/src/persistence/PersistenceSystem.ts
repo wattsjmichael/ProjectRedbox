@@ -1,4 +1,14 @@
-import type { WeaponItem } from '../items/ItemTypes'
+import type {
+  ArmorItem,
+  InventoryItem,
+  WeaponItem,
+} from '../items/ItemTypes'
+import {
+  cloneInventoryItem,
+  isArmorItem,
+  isWeaponItem,
+} from '../items/ItemTypes'
+import { createDefaultArmor } from '../items/ArmorTypes'
 import type {
   CoreData,
 } from '../core/CoreTypes'
@@ -7,6 +17,12 @@ import {
   createStarterCore,
 } from '../core/CoreTypes'
 import { createDefaultPlayerStats } from '../player/PlayerStats'
+import {
+  canEquipArmor,
+} from '../progression/HunterProgressionConfig'
+import type {
+  DropTier,
+} from '../progression/HunterProgressionConfig'
 
 export interface PersistentPlayerProgression {
   level: number
@@ -27,12 +43,14 @@ export interface LifetimeStats {
 export interface AccountProgression {
   hunterName: string
   currency: number
+  selectedDropTier?: DropTier
   lifetimeStats: LifetimeStats
 }
 
 export interface PersistentGameData {
-  inventory: WeaponItem[]
+  inventory: InventoryItem[]
   equippedWeapon: WeaponItem | null
+  equippedArmor: ArmorItem
   core: CoreData
   player: PersistentPlayerProgression
   account: AccountProgression
@@ -52,7 +70,7 @@ export interface TutorialSaveState {
 }
 
 interface SaveFile extends PersistentGameData {
-  version: 4
+  version: 5
 }
 
 export interface HunterProfileSummary {
@@ -91,7 +109,7 @@ interface ProfileIndex {
 interface LegacyVersionThreeSave
   extends Omit<
     PersistentGameData,
-    'core'
+    'core' | 'equippedArmor'
   > {
   mag: Omit<CoreData, 'stage'>
   version: 3
@@ -100,7 +118,7 @@ interface LegacyVersionThreeSave
 interface LegacyVersionTwoSave
   extends Omit<
     PersistentGameData,
-    'tutorial' | 'core'
+    'tutorial' | 'core' | 'equippedArmor'
   > {
   mag: Omit<CoreData, 'stage'>
   version: 2
@@ -109,7 +127,7 @@ interface LegacyVersionTwoSave
 interface LegacyVersionOneSave
   extends Omit<
     PersistentGameData,
-    'account' | 'tutorial' | 'core'
+    'account' | 'tutorial' | 'core' | 'equippedArmor'
   > {
   mag: Omit<CoreData, 'stage'>
   version: 1
@@ -122,6 +140,8 @@ export function createDefaultAccount():
       'RED HUNTER',
     currency:
       0,
+    selectedDropTier:
+      1,
     lifetimeStats: {
       runs:
         0,
@@ -202,8 +222,12 @@ export class PersistenceSystem {
     hunterName = 'HUNTER'
   ):
     PersistentGameData {
+    const starterArmor =
+      createDefaultArmor()
     const inventory:
-      WeaponItem[] = []
+      InventoryItem[] = [
+        starterArmor,
+      ]
     const player =
       createDefaultPlayerStats()
 
@@ -211,6 +235,8 @@ export class PersistenceSystem {
       inventory,
       equippedWeapon:
         null,
+      equippedArmor:
+        starterArmor,
       core:
         createStarterCore(),
       player: {
@@ -300,11 +326,20 @@ export class PersistenceSystem {
 
   listProfiles(): HunterProfileSummary[] {
     const index = this.readProfileIndex()
+    const summaries = index.profiles.map(summary => {
+      const stored = this.loadStoredProfile(summary.id)
+      if (!stored) return { ...summary, unavailable: true }
+      return this.buildSummary({
+        id: stored.id,
+        name: stored.name,
+        createdAt: stored.createdAt,
+        updatedAt: stored.updatedAt,
+        saveData: stored.saveData,
+      })
+    })
 
-    return index.profiles.map(summary => ({
-      ...summary,
-      unavailable: this.loadStoredProfile(summary.id) === null,
-    }))
+    this.writeProfileIndex({ version: 1, profiles: summaries })
+    return summaries
   }
 
   createProfile(
@@ -420,7 +455,7 @@ export class PersistenceSystem {
 
   private writeProfile(profile: HunterProfile) {
     const saveFile: SaveFile = {
-      version: 4,
+      version: 5,
       ...this.clone(profile.saveData),
     }
     const stored: StoredHunterProfile = {
@@ -470,17 +505,29 @@ export class PersistenceSystem {
       const saveData = this.parseSaveValue(value.saveData)
       if (!saveData) return null
 
-      return {
+      const stored: StoredHunterProfile = {
         version: 1,
         id,
         name: value.name,
         createdAt: value.createdAt,
         updatedAt: value.updatedAt,
         saveData: {
-          version: 4,
+          version: 5,
           ...saveData,
         },
       }
+
+      if (
+        !this.isRecord(value.saveData) ||
+        value.saveData.version !== 5
+      ) {
+        window.localStorage.setItem(
+          this.getProfileKey(id),
+          JSON.stringify(stored)
+        )
+      }
+
+      return stored
     } catch (error) {
       console.warn(`Could not load Hunter profile ${id}.`, error)
       return null
@@ -573,7 +620,10 @@ export class PersistenceSystem {
       updatedAt: profile.updatedAt,
       hunterLevel: profile.saveData.player.level ?? 1,
       equippedWeaponName: profile.saveData.equippedWeapon?.name ?? 'None',
-      equippedArmorName: 'None',
+      equippedArmorName:
+        canEquipArmor(profile.saveData.player.level)
+          ? profile.saveData.equippedArmor.name
+          : 'Slot Locked',
       coreLevel: profile.saveData.core.level,
       coreStage: profile.saveData.core.stage,
       completedDrops: profile.saveData.account.lifetimeStats.runs,
@@ -599,10 +649,15 @@ export class PersistenceSystem {
   }
 
   private parseSaveValue(value: unknown): PersistentGameData | null {
+    if (this.isRecord(value) && value.version === 4) {
+      return this.migrateVersionFourSave(value)
+    }
+
     if (this.isLegacyVersionOneSave(value)) {
       return this.removeTestWeapons({
         inventory: value.inventory,
         equippedWeapon: value.equippedWeapon,
+        equippedArmor: createDefaultArmor(),
         core: this.migrateLegacyCore(value.mag),
         player: value.player,
         account: createDefaultAccount(),
@@ -614,6 +669,7 @@ export class PersistenceSystem {
       return this.removeTestWeapons({
         inventory: value.inventory,
         equippedWeapon: value.equippedWeapon,
+        equippedArmor: createDefaultArmor(),
         core: this.migrateLegacyCore(value.mag),
         player: value.player,
         account: value.account,
@@ -625,27 +681,11 @@ export class PersistenceSystem {
       return this.removeTestWeapons({
         inventory: value.inventory,
         equippedWeapon: value.equippedWeapon,
+        equippedArmor: createDefaultArmor(),
         core: this.migrateLegacyCore(value.mag),
         player: value.player,
         account: value.account,
         tutorial: value.tutorial,
-      })
-    }
-
-    if (
-      this.isRecord(value) &&
-      value.version === 4 &&
-      this.hasValidCurrentData(value) &&
-      !this.isCore(value.core) &&
-      this.isLegacyCore(value.core)
-    ) {
-      return this.removeTestWeapons({
-        inventory: value.inventory as WeaponItem[],
-        equippedWeapon: value.equippedWeapon as WeaponItem | null,
-        core: this.migrateLegacyCore(value.core),
-        player: value.player as PersistentPlayerProgression,
-        account: value.account as AccountProgression,
-        tutorial: value.tutorial as TutorialSaveState,
       })
     }
 
@@ -657,16 +697,28 @@ export class PersistenceSystem {
   private clone(
     data: PersistentGameData
   ): PersistentGameData {
+    const inventory =
+      data.inventory.map(
+        cloneInventoryItem
+      )
+    const sourceArmor =
+      this.isArmor(data.equippedArmor)
+        ? data.equippedArmor
+        : createDefaultArmor()
+
+    if (
+      !inventory.some(
+        item => item.id === sourceArmor.id
+      ) &&
+      inventory.length < 30
+    ) {
+      inventory.push(
+        cloneInventoryItem(sourceArmor)
+      )
+    }
+
     return {
-      inventory:
-        data.inventory.map(
-          item => ({
-            ...item,
-            modifiers: item.modifiers
-              ? { ...item.modifiers }
-              : undefined,
-          })
-        ),
+      inventory,
       equippedWeapon:
         data.equippedWeapon
           ? {
@@ -676,6 +728,8 @@ export class PersistenceSystem {
                 : undefined,
             }
           : null,
+      equippedArmor:
+        cloneInventoryItem(sourceArmor),
       core: {
         ...data.core,
         stats: {
@@ -687,6 +741,10 @@ export class PersistenceSystem {
       },
       account: {
         ...data.account,
+        selectedDropTier:
+          data.account.selectedDropTier === 2
+            ? 2
+            : 1,
         lifetimeStats: {
           ...data.account.lifetimeStats,
         },
@@ -702,17 +760,18 @@ export class PersistenceSystem {
   ): value is SaveFile {
     if (
       !this.isRecord(value) ||
-      value.version !== 4 ||
+      value.version !== 5 ||
       !Array.isArray(value.inventory) ||
-      value.inventory.length > 30 ||
-      !value.inventory.every(
-        item => this.isWeapon(item)
-      ) ||
+      value.inventory.length > 31 ||
+      !value.inventory.every(item => this.isInventoryItem(item)) ||
       (
         value.equippedWeapon !== null &&
         !this.isWeapon(
           value.equippedWeapon
         )
+      ) ||
+      (
+        !this.isArmor(value.equippedArmor)
       ) ||
       !this.isCore(value.core) ||
       !this.isPlayer(value.player) ||
@@ -726,14 +785,97 @@ export class PersistenceSystem {
       value.equippedWeapon as
         WeaponItem | null
 
+    const equippedArmor =
+      value.equippedArmor as ArmorItem
+
     return (
-      equippedWeapon === null ||
-      value.inventory.some(
-        item =>
-          item.id ===
-          equippedWeapon.id
+      value.inventory.some(item => item.id === equippedArmor.id) &&
+      (
+        equippedWeapon === null ||
+        value.inventory.some(
+          item =>
+            item.id ===
+            equippedWeapon.id
+        )
       )
     )
+  }
+
+  private migrateVersionFourSave(
+    value: Record<string, unknown>
+  ): PersistentGameData | null {
+    if (
+      !Array.isArray(value.inventory) ||
+      value.inventory.length > 30 ||
+      !this.isPlayer(value.player) ||
+      !this.isAccount(value.account) ||
+      !this.isTutorial(value.tutorial) ||
+      (
+        value.equippedWeapon !== null &&
+        !this.isWeapon(value.equippedWeapon)
+      )
+    ) {
+      return null
+    }
+
+    const inventory: InventoryItem[] = []
+    for (const rawItem of value.inventory) {
+      if (this.isInventoryItem(rawItem)) {
+        inventory.push(rawItem)
+        continue
+      }
+
+      // Temporary pre-Day-42 armor records contained only id and name.
+      if (
+        this.isRecord(rawItem) &&
+        typeof rawItem.id === 'string' &&
+        rawItem.id.startsWith('starter-') &&
+        typeof rawItem.name === 'string'
+      ) {
+        continue
+      }
+
+      return null
+    }
+
+    const equippedWeapon =
+      value.equippedWeapon as WeaponItem | null
+    if (
+      equippedWeapon &&
+      !inventory.some(
+        item => isWeaponItem(item) && item.id === equippedWeapon.id
+      )
+    ) {
+      return null
+    }
+
+    const storedArmor =
+      this.isArmor(value.equippedArmor)
+        ? value.equippedArmor
+        : inventory.find(isArmorItem) ??
+          createDefaultArmor()
+
+    if (!inventory.some(item => item.id === storedArmor.id)) {
+      inventory.push(storedArmor)
+    }
+
+    const core =
+      this.isCore(value.core)
+        ? value.core
+        : this.isLegacyCore(value.core)
+          ? this.migrateLegacyCore(value.core)
+          : null
+    if (!core) return null
+
+    return this.removeTestWeapons({
+      inventory,
+      equippedWeapon,
+      equippedArmor: storedArmor,
+      core,
+      player: value.player,
+      account: value.account,
+      tutorial: value.tutorial,
+    })
   }
 
   private isLegacyVersionThreeSave(
@@ -840,56 +982,6 @@ export class PersistenceSystem {
     )
   }
 
-  private hasValidCurrentData(
-    value:
-      Record<string, unknown>
-  ) {
-    return (
-      Array.isArray(
-        value.inventory
-      ) &&
-      value.inventory.length <= 30 &&
-      value.inventory.every(
-        item =>
-          this.isWeapon(
-            item
-          )
-      ) &&
-      (
-        value.equippedWeapon ===
-          null ||
-        this.isWeapon(
-          value.equippedWeapon
-        )
-      ) &&
-      this.isLegacyCore(
-        value.core
-      ) &&
-      this.isPlayer(
-        value.player
-      ) &&
-      this.isAccount(
-        value.account
-      ) &&
-      this.isTutorial(
-        value.tutorial
-      ) &&
-      (
-        value.equippedWeapon ===
-          null ||
-        value.inventory.some(
-          item =>
-            this.isWeapon(item) &&
-            item.id ===
-              (
-                value.equippedWeapon as
-                  WeaponItem
-              ).id
-        )
-      )
-    )
-  }
-
   private isWeapon(
     value: unknown
   ): value is WeaponItem {
@@ -911,6 +1003,57 @@ export class PersistenceSystem {
       this.isNumber(value.speed) &&
       this.isNumber(value.criticalChance) &&
       this.isNumber(value.criticalDamage)
+    )
+  }
+
+  private isInventoryItem(
+    value: unknown
+  ): value is InventoryItem {
+    return this.isWeapon(value) || this.isArmor(value)
+  }
+
+  private isArmor(
+    value: unknown
+  ): value is ArmorItem {
+    return (
+      this.isRecord(value) &&
+      value.category === 'armor' &&
+      typeof value.id === 'string' &&
+      value.id.length > 0 &&
+      typeof value.name === 'string' &&
+      value.name.length > 0 &&
+      ['common', 'uncommon', 'rare'].includes(String(value.rarity)) &&
+      value.armorType === 'suit' &&
+      this.isNumber(value.defense) &&
+      this.isRecord(value.secondaryStats) &&
+      this.isNumber(value.secondaryStats.maxHealth) &&
+      this.isNumber(value.secondaryStats.moveSpeedPercent) &&
+      this.isNumber(value.secondaryStats.pickupRadiusPercent) &&
+      this.isNumber(value.secondaryStats.coreFeedBonusPercent) &&
+      Array.isArray(value.affixes) &&
+      value.affixes.every(affix => this.isArmorAffix(affix)) &&
+      typeof value.appearanceId === 'string'
+    )
+  }
+
+  private isArmorAffix(value: unknown) {
+    return (
+      this.isRecord(value) &&
+      typeof value.id === 'string' &&
+      ['reinforced', 'vital', 'mobile', 'salvager', 'integrated']
+        .includes(String(value.type)) &&
+      typeof value.displayName === 'string' &&
+      typeof value.description === 'string' &&
+      this.isRecord(value.modifiers) &&
+      Object.entries(value.modifiers).every(([key, modifier]) =>
+        [
+          'defense',
+          'maxHealth',
+          'moveSpeedPercent',
+          'pickupRadiusPercent',
+          'coreFeedBonusPercent',
+        ].includes(key) && this.isNumber(modifier)
+      )
     )
   }
 
@@ -997,6 +1140,11 @@ export class PersistenceSystem {
       typeof value.hunterName === 'string' &&
       value.hunterName.length > 0 &&
       this.isInteger(value.currency, 0) &&
+      (
+        value.selectedDropTier === undefined ||
+        value.selectedDropTier === 1 ||
+        value.selectedDropTier === 2
+      ) &&
       this.isRecord(value.lifetimeStats) &&
       this.isInteger(
         value.lifetimeStats.runs,

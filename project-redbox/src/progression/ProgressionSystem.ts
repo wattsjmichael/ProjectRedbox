@@ -1,16 +1,29 @@
-import Phaser from 'phaser'
-import type { PlayerStats } from '../player/PlayerStats'
+import {
+  getHunterRewardSummary,
+} from './HunterProgressionConfig'
 
-export interface LevelGains {
-  hpGain: number
-  powerGain: number
-  defenseGain: number
+import type {
+  HunterRewardSummary,
+} from './HunterProgressionConfig'
+
+export interface HunterProgressState {
+  level: number
+  currentXP: number
+  xpToNextLevel: number
+}
+
+export interface HunterProgressionResult {
+  xpGained: number
+  previousLevel: number
+  newLevel: number
+  levelsGained: number
+  rewards: HunterRewardSummary
 }
 
 export class ProgressionSystem {
-  private stats: PlayerStats
+  private stats: HunterProgressState
 
-  constructor(stats: PlayerStats) {
+  constructor(stats: HunterProgressState) {
     this.stats = stats
   }
 
@@ -18,50 +31,27 @@ export class ProgressionSystem {
     return this.stats
   }
 
-  addXP(amount: number): LevelGains | null {
-    this.stats.currentXP += amount
+  addXP(amount: number): HunterProgressionResult {
+    const xpGained = Math.max(0, Math.floor(amount))
+    const previousLevel = this.stats.level
 
-    if (
-      this.stats.currentXP <
-      this.stats.xpToNextLevel
-    ) {
-      return null
+    this.stats.currentXP += xpGained
+
+    while (this.stats.currentXP >= this.stats.xpToNextLevel) {
+      this.stats.currentXP -= this.stats.xpToNextLevel
+      this.stats.level++
+      this.stats.xpToNextLevel = Math.max(
+        1,
+        Math.floor(this.stats.xpToNextLevel * 1.4)
+      )
     }
 
-    return this.levelUp()
-  }
-
-  private levelUp(): LevelGains {
-    this.stats.currentXP -=
-      this.stats.xpToNextLevel
-
-    this.stats.level++
-
-    this.stats.xpToNextLevel =
-      Math.floor(
-        this.stats.xpToNextLevel *
-          1.4
-      )
-
-    const hpGain =
-      Phaser.Math.Between(4, 6)
-
-    const powerGain =
-      Phaser.Math.Between(1, 3)
-
-    const defenseGain =
-      Phaser.Math.Between(1, 2)
-
-    this.stats.maxHealth += hpGain
-    this.stats.health += hpGain
-
-    this.stats.power += powerGain
-    this.stats.defense += defenseGain
-
     return {
-      hpGain,
-      powerGain,
-      defenseGain,
+      xpGained,
+      previousLevel,
+      newLevel: this.stats.level,
+      levelsGained: this.stats.level - previousLevel,
+      rewards: getHunterRewardSummary(previousLevel, this.stats.level),
     }
   }
 }

@@ -1,5 +1,9 @@
 import type {
+  InventoryItem,
   WeaponItem,
+} from '../items/ItemTypes'
+import {
+  isArmorItem,
 } from '../items/ItemTypes'
 
 import type {
@@ -209,11 +213,16 @@ export class CoreSystem {
 
   previewFeed(
     item:
-      WeaponItem
+      InventoryItem,
+    coreFeedBonusPercent = 0
   ): CoreFeedPreview {
     const experienceGained =
-      this.getExperienceForItem(
-        item
+      Math.max(
+        1,
+        Math.round(
+          this.getExperienceForItem(item) *
+          (1 + coreFeedBonusPercent)
+        )
       )
 
     const statGained =
@@ -222,7 +231,7 @@ export class CoreSystem {
       )
 
     const statName =
-      this.getStatForWeapon(
+      this.getStatForItem(
         item
       )
 
@@ -237,9 +246,17 @@ export class CoreSystem {
     item:
       WeaponItem
   ): CoreFeedResult {
+    return this.feedItem(item)
+  }
+
+  feedItem(
+    item: InventoryItem,
+    coreFeedBonusPercent = 0
+  ): CoreFeedResult {
     const preview =
       this.previewFeed(
-        item
+        item,
+        coreFeedBonusPercent
       )
     const oldStage =
       this.core.stage
@@ -292,7 +309,7 @@ export class CoreSystem {
 
   private getExperienceForItem(
     item:
-      WeaponItem
+      InventoryItem
   ) {
     switch (
       item.rarity
@@ -310,7 +327,7 @@ export class CoreSystem {
 
   private getStatGrowthForItem(
     item:
-      WeaponItem
+      InventoryItem
   ) {
     switch (
       item.rarity
@@ -326,14 +343,18 @@ export class CoreSystem {
     }
   }
 
-  private getStatForWeapon(
+  private getStatForItem(
     item:
-      WeaponItem
+      InventoryItem
   ):
     | 'power'
     | 'defense'
     | 'dexterity'
     | 'energy' {
+    if (isArmorItem(item)) {
+      return 'defense'
+    }
+
     switch (
       item.weaponType
     ) {

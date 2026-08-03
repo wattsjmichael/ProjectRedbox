@@ -54,9 +54,15 @@ export interface WeaponModifiers {
 
 export interface BaseItem {
   id: string
+  category: ItemCategory
   name: string
   rarity: ItemRarity
+  acquiredAt?: number
 }
+
+export type ItemCategory =
+  | 'weapon'
+  | 'armor'
 
 export interface WeaponItem
   extends BaseItem {
@@ -88,4 +94,78 @@ export interface WeaponItem
 
   modifiers?:
     WeaponModifiers
+}
+
+export type ArmorType = 'suit'
+
+export interface ArmorSecondaryStats {
+  maxHealth: number
+  moveSpeedPercent: number
+  pickupRadiusPercent: number
+  coreFeedBonusPercent: number
+}
+
+export type ArmorAffixType =
+  | 'reinforced'
+  | 'vital'
+  | 'mobile'
+  | 'salvager'
+  | 'integrated'
+
+export interface ArmorModifiers {
+  defense: number
+  maxHealth: number
+  moveSpeedPercent: number
+  pickupRadiusPercent: number
+  coreFeedBonusPercent: number
+}
+
+export interface ArmorAffix {
+  id: string
+  type: ArmorAffixType
+  displayName: string
+  description: string
+  modifiers: Partial<ArmorModifiers>
+}
+
+export interface ArmorItem extends BaseItem {
+  category: 'armor'
+  armorType: ArmorType
+  defense: number
+  secondaryStats: ArmorSecondaryStats
+  affixes: ArmorAffix[]
+  appearanceId: string
+}
+
+export type InventoryItem =
+  | WeaponItem
+  | ArmorItem
+
+export function isWeaponItem(item: InventoryItem): item is WeaponItem {
+  return item.category === 'weapon'
+}
+
+export function isArmorItem(item: InventoryItem): item is ArmorItem {
+  return item.category === 'armor'
+}
+
+export function cloneInventoryItem(item: WeaponItem): WeaponItem
+export function cloneInventoryItem(item: ArmorItem): ArmorItem
+export function cloneInventoryItem(item: InventoryItem): InventoryItem
+export function cloneInventoryItem(item: InventoryItem): InventoryItem {
+  if (isWeaponItem(item)) {
+    return {
+      ...item,
+      modifiers: item.modifiers ? { ...item.modifiers } : undefined,
+    }
+  }
+
+  return {
+    ...item,
+    secondaryStats: { ...item.secondaryStats },
+    affixes: item.affixes.map(affix => ({
+      ...affix,
+      modifiers: { ...affix.modifiers },
+    })),
+  }
 }

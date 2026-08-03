@@ -5,8 +5,12 @@ import type {
 } from '../player/PlayerStats'
 
 import type {
-  LevelGains,
+  HunterProgressionResult,
 } from '../progression/ProgressionSystem'
+
+import {
+  getHunterRewardDisplayLines,
+} from '../progression/HunterProgressionConfig'
 
 interface HudNotification {
   message: string
@@ -1286,15 +1290,23 @@ export class HUD {
   }
 
   showLevelUp(
-    level: number,
-    gains: LevelGains
+    result: HunterProgressionResult
   ) {
+    const rewardLines =
+      getHunterRewardDisplayLines(
+        result.rewards
+      )
+    const milestone =
+      result.rewards.rewards
+        .map(reward => reward.displayName.toUpperCase())
+        .join(' // ')
+
     const levelText =
       this.scene.add
         .text(
           640,
           280,
-          `LEVEL ${level}`,
+          `HUNTER LEVEL ${result.newLevel}`,
           {
             fontFamily:
               'Arial Black, Arial',
@@ -1324,7 +1336,11 @@ export class HUD {
         .text(
           640,
           345,
-          `HP +${gains.hpGain}\nPOWER +${gains.powerGain}\nDEFENSE +${gains.defenseGain}`,
+          [
+            milestone,
+            ...rewardLines,
+          ].filter(Boolean).join('\n') ||
+            'HUNTER PROGRESSION INCREASED',
           {
             fontSize:
               '20px',

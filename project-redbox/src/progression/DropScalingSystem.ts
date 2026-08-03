@@ -10,13 +10,23 @@ import type {
   AccountProgression,
 } from '../persistence/PersistenceSystem'
 
+import {
+  getDropTierDefinition,
+} from './HunterProgressionConfig'
+
+import type {
+  DropTier,
+} from './HunterProgressionConfig'
+
 export interface DropScaling {
   dropNumber: number
+  dropTier: DropTier
   progressionScore: number
   enemyHealthMultiplier: number
   enemyDamageMultiplier: number
   wyrmHealthMultiplier: number
   wyrmDamageMultiplier: number
+  rareDropChanceMultiplier: number
 }
 
 export class DropScalingSystem {
@@ -26,7 +36,9 @@ export class DropScalingSystem {
     equippedWeapon:
       WeaponItem | null,
     account:
-      AccountProgression
+      AccountProgression,
+    dropTier:
+      DropTier = 1
   ):
     DropScaling {
     const coreScore =
@@ -78,35 +90,39 @@ export class DropScalingSystem {
         )
       )
 
+    const tier =
+      getDropTierDefinition(
+        dropTier
+      )
+
     return {
       dropNumber:
         account.lifetimeStats.runs +
         1,
+      dropTier,
       progressionScore,
       enemyHealthMultiplier:
-        this.toMultiplier(
-          progressionScore,
-          0.01,
-          0.2
+        this.combineMultipliers(
+          this.toMultiplier(progressionScore, 0.01, 0.2),
+          tier.enemyHealthMultiplier
         ),
       enemyDamageMultiplier:
-        this.toMultiplier(
-          progressionScore,
-          0.0075,
-          0.15
+        this.combineMultipliers(
+          this.toMultiplier(progressionScore, 0.0075, 0.15),
+          tier.enemyDamageMultiplier
         ),
       wyrmHealthMultiplier:
-        this.toMultiplier(
-          progressionScore,
-          0.009,
-          0.2
+        this.combineMultipliers(
+          this.toMultiplier(progressionScore, 0.009, 0.2),
+          tier.wyrmHealthMultiplier
         ),
       wyrmDamageMultiplier:
-        this.toMultiplier(
-          progressionScore,
-          0.007,
-          0.15
+        this.combineMultipliers(
+          this.toMultiplier(progressionScore, 0.007, 0.15),
+          tier.wyrmDamageMultiplier
         ),
+      rareDropChanceMultiplier:
+        tier.rareDropChanceMultiplier,
     }
   }
 
@@ -141,5 +157,12 @@ export class DropScalingSystem {
         3
       )
     )
+  }
+
+  private static combineMultipliers(
+    first: number,
+    second: number
+  ) {
+    return Number((first * second).toFixed(3))
   }
 }

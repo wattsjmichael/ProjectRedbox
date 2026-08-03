@@ -9,6 +9,8 @@ import type {
 } from '../encounters/EncounterTypes'
 
 import type {
+  ArmorItem,
+  InventoryItem,
   WeaponItem,
 } from '../items/ItemTypes'
 
@@ -35,6 +37,20 @@ import {
 import type {
   DropScaling,
 } from '../progression/DropScalingSystem'
+
+import {
+  getHunterRewardSummary,
+  normalizeSelectedDropTier,
+} from '../progression/HunterProgressionConfig'
+
+import {
+  calculateDamageReduction,
+  calculateHunterStats,
+} from '../player/PlayerStatCalculator'
+
+import {
+  getArmorModifiers,
+} from '../items/ArmorTypes'
 
 import {
   WeaponSystem,
@@ -204,6 +220,15 @@ export class GameScene
   private runScaling!:
     DropScaling
 
+  private hunterXPGained =
+    0
+
+  private runStartingHunterLevel =
+    1
+
+  private runStartingHunterXP =
+    0
+
   constructor() {
     super(
       'GameScene'
@@ -223,6 +248,12 @@ export class GameScene
     this.account =
       this.loadedSave.account
 
+    this.account.selectedDropTier =
+      normalizeSelectedDropTier(
+        this.loadedSave.player.level,
+        this.account.selectedDropTier
+      )
+
     this.runScaling =
       DropScalingSystem.calculate(
         this.loadedSave?.core ??
@@ -230,7 +261,8 @@ export class GameScene
         this.loadedSave
           ?.equippedWeapon ??
         null,
-        this.account
+        this.account,
+        this.account.selectedDropTier
       )
 
     this.logRunScaling()
@@ -324,7 +356,8 @@ export class GameScene
     ) {
       this.inventorySystem.restore(
         this.loadedSave.inventory,
-        this.loadedSave.equippedWeapon
+        this.loadedSave.equippedWeapon,
+        this.loadedSave.equippedArmor
       )
 
       const equipped =
@@ -377,11 +410,27 @@ export class GameScene
             }
           },
 
+        getCoreFeedBonusPercent:
+          () =>
+            getArmorModifiers(
+              this.inventorySystem.getEquippedArmor() ??
+              this.loadedSave!.equippedArmor
+            ).coreFeedBonusPercent,
+
         onEquip:
           (
             item
           ) => {
             this.equipWeaponItem(
+              item
+            )
+          },
+
+        onEquipArmor:
+          (
+            item
+          ) => {
+            this.equipArmorItem(
               item
             )
           },
@@ -404,7 +453,7 @@ export class GameScene
 
   private feedItemToCore(
     item:
-      WeaponItem
+      InventoryItem
   ) {
     if (
       this.coreFeedInProgress
@@ -418,7 +467,7 @@ export class GameScene
       )
     ) {
       this.hud.showLootMessage(
-        'CANNOT FEED EQUIPPED WEAPON'
+        'CANNOT FEED EQUIPPED ITEM'
       )
 
       return false
@@ -441,8 +490,12 @@ export class GameScene
     }
 
     const result =
-      this.coreSystem.feedWeapon(
-        item
+      this.coreSystem.feedItem(
+        item,
+        getArmorModifiers(
+          this.inventorySystem.getEquippedArmor() ??
+          this.loadedSave!.equippedArmor
+        ).coreFeedBonusPercent
       )
 
     this.savePersistentState()
@@ -507,31 +560,46 @@ export class GameScene
       createDefaultPlayerStats()
 
     const savedPlayer =
-      this.loadedSave?.player
+      this.loadedSave?.player ??
+      defaults
+    const calculated =
+      calculateHunterStats(
+        savedPlayer,
+        this.loadedSave?.equippedArmor ??
+        null
+      )
 
     this.playerStats = {
       ...defaults,
+      level:
+        savedPlayer.level,
+      currentXP:
+        savedPlayer.currentXP,
+      xpToNextLevel:
+        savedPlayer.xpToNextLevel,
       maxHealth:
-        savedPlayer?.maxHealth ??
-        defaults.maxHealth,
+        calculated.maxHealth,
       health:
-        savedPlayer?.maxHealth ??
-        defaults.maxHealth,
+        calculated.maxHealth,
       power:
-        savedPlayer?.power ??
-        defaults.power,
+        calculated.power,
       defense:
-        savedPlayer?.defense ??
-        defaults.defense,
+        calculated.defense,
       speed:
-        savedPlayer?.speed ??
-        defaults.speed,
+        calculated.speed,
     }
 
     this.progression =
       new ProgressionSystem(
         this.playerStats
       )
+
+    this.runStartingHunterLevel =
+      this.playerStats.level
+    this.runStartingHunterXP =
+      this.playerStats.currentXP
+    this.hunterXPGained =
+      0
 
     this.killCount =
       0
@@ -716,10 +784,16 @@ export class GameScene
           },
         getCoreAttackMultiplier:
           () => {
+            const basePower =
+              createDefaultPlayerStats().power
+
             return (
               this.coreSystem
                 ?.getAttackMultiplier() ??
               1
+            ) * Math.max(
+              1,
+              this.playerStats.power / basePower
             )
           },
 
@@ -908,9 +982,21 @@ export class GameScene
           },
 
         getPickupRadiusMultiplier:
+          () => {
+            const armor =
+              this.inventorySystem.getEquippedArmor()
+            const armorBonus =
+              armor
+                ? getArmorModifiers(armor).pickupRadiusPercent
+                : 0
+            return this.coreSystem.getPickupRadiusMultiplier() *
+              (1 + armorBonus)
+          },
+
+        getRareDropChanceMultiplier:
           () =>
-            this.coreSystem
-              .getPickupRadiusMultiplier(),
+            this.runScaling
+              .rareDropChanceMultiplier,
       })
   }
 
@@ -1504,9 +1590,12 @@ export class GameScene
     }
 
     const defenseReduction =
-      this.coreSystem
-        ?.getDefenseReduction() ??
-      0
+      calculateDamageReduction(
+        this.playerStats.defense,
+        this.coreSystem
+          ?.getDefenseReduction() ??
+        0
+      )
 
     const finalDamage =
       Math.max(
@@ -1571,6 +1660,10 @@ export class GameScene
 
     this.input.keyboard?.resetKeys()
 
+    this.input.setDefaultCursor(
+      'default'
+    )
+
     this.player.destroy()
 
     this.coreVisual?.destroy()
@@ -1616,6 +1709,43 @@ export class GameScene
 
     this.hud.hideCombo()
 
+    this.savePersistentState()
+  }
+
+  private equipArmorItem(
+    item: ArmorItem
+  ) {
+    const previousMaxHealth =
+      this.playerStats.maxHealth
+    const basePlayer = {
+      ...(this.loadedSave?.player ?? createDefaultPlayerStats()),
+      level: this.playerStats.level,
+      currentXP: this.playerStats.currentXP,
+      xpToNextLevel: this.playerStats.xpToNextLevel,
+    }
+    const calculated =
+      calculateHunterStats(
+        basePlayer,
+        item
+      )
+
+    this.playerStats.maxHealth = calculated.maxHealth
+    this.playerStats.health = Math.min(
+      calculated.maxHealth,
+      Math.max(
+        1,
+        this.playerStats.health +
+        calculated.maxHealth -
+        previousMaxHealth
+      )
+    )
+    this.playerStats.power = calculated.power
+    this.playerStats.defense = calculated.defense
+    this.playerStats.speed = calculated.speed
+    this.hud.updateHealth(this.playerStats)
+    this.hud.showLootMessage(
+      `ARMOR EQUIPPED // ${item.name.toUpperCase()}`
+    )
     this.savePersistentState()
   }
 
@@ -1691,17 +1821,46 @@ export class GameScene
           ? 20
           : 1
 
-    const gains =
+    const progressResult =
       this.progression.addXP(
         xpReward
       )
 
+    this.hunterXPGained +=
+      progressResult.xpGained
+
     if (
-      gains
+      progressResult.levelsGained > 0
     ) {
+      const previousMaxHealth =
+        this.playerStats.maxHealth
+      const basePlayer =
+        this.loadedSave?.player ??
+        createDefaultPlayerStats()
+      const calculated =
+        calculateHunterStats(
+          {
+            ...basePlayer,
+            level:
+              progressResult.newLevel,
+          },
+          this.inventorySystem.getEquippedArmor()
+        )
+
+      this.playerStats.maxHealth =
+        calculated.maxHealth
+      this.playerStats.health +=
+        this.playerStats.maxHealth -
+        previousMaxHealth
+      this.playerStats.power =
+        calculated.power
+      this.playerStats.defense =
+        calculated.defense
+      this.playerStats.speed =
+        calculated.speed
+
       this.hud.showLevelUp(
-        this.playerStats.level,
-        gains
+        progressResult
       )
 
       this.hud.updateHealth(
@@ -1900,6 +2059,12 @@ export class GameScene
       return
     }
 
+    const persistentPlayer =
+      this.loadedSave?.player ??
+      createDefaultPlayerStats()
+    const hunterProgress =
+      this.progression.getStats()
+
     this.persistence.save({
       inventory:
         this.inventorySystem
@@ -1907,28 +2072,20 @@ export class GameScene
       equippedWeapon:
         this.inventorySystem
           .getEquippedItem(),
+      equippedArmor:
+        this.inventorySystem
+          .getEquippedArmor() ??
+        this.loadedSave!.equippedArmor,
       core:
         this.coreSystem.getCore(),
       player: {
-        ...(
-          this.loadedSave?.player ??
-          {
-            level:
-              1,
-            currentXP:
-              0,
-            xpToNextLevel:
-              10,
-            maxHealth:
-              100,
-            power:
-              10,
-            defense:
-              5,
-            speed:
-              250,
-          }
-        ),
+        ...persistentPlayer,
+        level:
+          hunterProgress.level,
+        currentXP:
+          hunterProgress.currentXP,
+        xpToNextLevel:
+          hunterProgress.xpToNextLevel,
       },
       account:
         this.account,
@@ -2008,6 +2165,8 @@ export class GameScene
       {
         drop:
           this.runScaling.dropNumber,
+        dropTier:
+          this.runScaling.dropTier,
         progressionScore:
           this.runScaling
             .progressionScore,
@@ -2023,6 +2182,9 @@ export class GameScene
         wyrmDamage:
           this.runScaling
             .wyrmDamageMultiplier,
+        rareDropChance:
+          this.runScaling
+            .rareDropChanceMultiplier,
       }
     )
   }
@@ -2061,6 +2223,27 @@ export class GameScene
             ...item,
           })
         ),
+      hunterProgress: {
+        xpGained:
+          this.hunterXPGained,
+        previousLevel:
+          this.runStartingHunterLevel,
+        newLevel:
+          this.playerStats.level,
+        previousXP:
+          this.runStartingHunterXP,
+        currentXP:
+          this.playerStats.currentXP,
+        xpToNextLevel:
+          this.playerStats.xpToNextLevel,
+        rewardLevels:
+          getHunterRewardSummary(
+            this.runStartingHunterLevel,
+            this.playerStats.level
+          ).rewards.map(
+            reward => reward.level
+          ),
+      },
     }
 
     this.account.lifetimeStats.runs++

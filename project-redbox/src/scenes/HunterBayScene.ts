@@ -1,8 +1,21 @@
 import Phaser from 'phaser'
 
 import type {
-  WeaponItem,
+  ArmorItem,
+  InventoryItem,
 } from '../items/ItemTypes'
+import {
+  isArmorItem,
+  isWeaponItem,
+} from '../items/ItemTypes'
+import {
+  createDevelopmentArmorItems,
+  getArmorModifiers,
+} from '../items/ArmorTypes'
+import {
+  calculateDamageReduction,
+  calculateHunterStats,
+} from '../player/PlayerStatCalculator'
 
 import {
   InventorySystem,
@@ -40,6 +53,20 @@ import {
   HunterHubTutorial,
 } from '../tutorial/HunterHubTutorial'
 
+import {
+  canEquipArmor,
+  getHighestUnlockedDropTier,
+  getHunterRewardDisplayLines,
+  getHunterRewardPreview,
+  getHunterRewardSummary,
+  getNextHunterLevelReward,
+  normalizeSelectedDropTier,
+} from '../progression/HunterProgressionConfig'
+
+import type {
+  DropTier,
+} from '../progression/HunterProgressionConfig'
+
 export class HunterBayScene
   extends Phaser.Scene {
   private readonly persistence =
@@ -65,7 +92,7 @@ export class HunterBayScene
     RunSummary | null = null
 
   private selectedItem:
-    WeaponItem | null = null
+    InventoryItem | null = null
 
   private page =
     0
@@ -90,6 +117,10 @@ export class HunterBayScene
     summary?:
       RunSummary
   ) {
+    this.input.setDefaultCursor(
+      'default'
+    )
+
     this.tutorial?.destroy()
     this.tutorial =
       null
@@ -117,7 +148,8 @@ export class HunterBayScene
       new InventorySystem()
     this.inventory.restore(
       saveData.inventory,
-      saveData.equippedWeapon
+      saveData.equippedWeapon,
+      saveData.equippedArmor
     )
     this.core =
       new CoreSystem(
@@ -129,6 +161,7 @@ export class HunterBayScene
 
     this.render()
     this.setupCoreDebugControl()
+    this.setupArmorDebugControl()
 
     if (
       !this.saveData.tutorial
@@ -149,7 +182,7 @@ export class HunterBayScene
             () =>
               this.inventory
                 .getItems()
-                .length > 0,
+                .some(isWeaponItem),
           hasFeedableItem:
             () =>
               this.inventory
@@ -214,6 +247,7 @@ export class HunterBayScene
     this.createRecentFinds()
     this.createInventoryGrid()
     this.createItemDetails()
+    this.createHunterProgression()
     this.createStatusMessage()
     this.createNavigation()
 
@@ -838,7 +872,7 @@ export class HunterBayScene
       this.add.text(
         660,
         250,
-        'SELECT A WEAPON',
+        'SELECT AN ITEM',
         {
           fontFamily:
             'Arial',
@@ -848,6 +882,11 @@ export class HunterBayScene
             '#666666',
         }
       )
+      return
+    }
+
+    if (isArmorItem(item)) {
+      this.createArmorDetails(item)
       return
     }
 
@@ -1024,8 +1063,9 @@ export class HunterBayScene
         }
 
         const result =
-          this.core.feedWeapon(
-            item
+          this.core.feedItem(
+            item,
+            this.getArmorCoreFeedBonus()
           )
         this.statusMessage =
           `CORE FED // ${item.name.toUpperCase()} // +${result.statGained} ${result.statName.toUpperCase()} // +${result.experienceGained} PROGRESS`
@@ -1087,7 +1127,8 @@ export class HunterBayScene
 
     const preview =
       this.core.previewFeed(
-        item
+        item,
+        this.getArmorCoreFeedBonus()
       )
     this.add.text(
       1075,
@@ -1134,6 +1175,229 @@ export class HunterBayScene
       .setOrigin(
         0.5
       )
+  }
+
+  private createArmorDetails(item: ArmorItem) {
+    const equipped = this.inventory.getEquippedArmor()
+    const selected = getArmorModifiers(item)
+    const current = equipped ? getArmorModifiers(equipped) : null
+    const calculated = calculateHunterStats(
+      this.saveData.player,
+      equipped
+    )
+    const coreReduction = this.core.getDefenseReduction()
+    const finalReduction = calculateDamageReduction(
+      calculated.defense,
+      coreReduction
+    )
+
+    this.add.text(630, 234, item.name.toUpperCase(), {
+      fontFamily: 'Arial Black, Arial', fontSize: '24px',
+      color: this.getRarityColor(item),
+    })
+    this.add.text(630, 271,
+      `${item.rarity.toUpperCase()} ARMOR // ${item.armorType.toUpperCase()}\n` +
+      `${item.affixes.map(affix => `${affix.displayName}: ${affix.description}`).join('\n') || 'NO AFFIXES'}`,
+      { fontFamily: 'Arial', fontSize: '13px', color: '#aaaaaa' }
+    )
+    this.add.text(630, 335,
+      `SELECTED                 EQUIPPED: ${equipped?.name ?? 'NONE'}`,
+      { fontFamily: 'Arial Black, Arial', fontSize: '13px', color: '#777777' }
+    )
+    this.add.text(630, 365, [
+      this.getComparisonLine('DEFENSE', selected.defense, current?.defense),
+      this.getComparisonLine('MAX HP', selected.maxHealth, current?.maxHealth),
+      this.getComparisonLine('MOVE %', selected.moveSpeedPercent * 100, current ? current.moveSpeedPercent * 100 : undefined),
+      this.getComparisonLine('PICKUP %', selected.pickupRadiusPercent * 100, current ? current.pickupRadiusPercent * 100 : undefined),
+      `BASE DEF     ${this.saveData.player.defense}`,
+      `FINAL DEF    ${calculated.defense} // CORE ${(coreReduction * 100).toFixed(0)}% // TOTAL DR ${(finalReduction * 100).toFixed(0)}%`,
+    ].join('\n'), {
+      fontFamily: 'Courier New, monospace', fontSize: '13px',
+      color: '#ffffff', lineSpacing: 5,
+    })
+
+    if (this.inventory.isArmorEquipped(item.id)) {
+      this.add.text(925, 514, 'CURRENTLY EQUIPPED', {
+        fontFamily: 'Arial Black, Arial', fontSize: '17px', color: '#e50914',
+      }).setOrigin(0.5)
+      return
+    }
+
+    this.createActionButton(775, 514, 260, 'EQUIP ARMOR', 0xe50914, () => {
+      const armor = this.inventory.equipArmor(item.id)
+      if (!armor) return
+      this.statusMessage = `${armor.name.toUpperCase()} EQUIPPED`
+      this.save()
+      this.render()
+    })
+    this.createActionButton(1075, 514, 260, 'FEED CORE', 0x3d1717, () => {
+      if (this.feedInProgress || !this.inventory.removeItem(item.id)) return
+      this.feedInProgress = true
+      const result = this.core.feedItem(item, this.getArmorCoreFeedBonus())
+      this.statusMessage =
+        `CORE FED // ${item.name.toUpperCase()} // +${result.statGained} DEFENSE // +${result.experienceGained} PROGRESS`
+      this.selectedItem = this.inventory.getEquippedArmor() ??
+        this.inventory.getEquippedItem() ??
+        this.inventory.getItems()[0] ?? null
+      this.save()
+      this.tutorial?.onCoreFed()
+      this.render()
+      this.time.delayedCall(250, () => { this.feedInProgress = false })
+    })
+    const preview = this.core.previewFeed(item, this.getArmorCoreFeedBonus())
+    this.add.text(1075, 472,
+      `FEED PREVIEW // DEFENSE +${preview.statGained} // PROGRESS +${preview.experienceGained}`,
+      { fontFamily: 'Arial', fontSize: '12px', color: '#cc9966' }
+    ).setOrigin(0.5)
+  }
+
+  private getArmorCoreFeedBonus() {
+    const armor = this.inventory.getEquippedArmor()
+    return armor
+      ? getArmorModifiers(armor).coreFeedBonusPercent
+      : 0
+  }
+
+  private createHunterProgression() {
+    const player =
+      this.saveData.player
+    const nextReward =
+      getNextHunterLevelReward(
+        player.level
+      )
+    const highestTier =
+      getHighestUnlockedDropTier(
+        player.level
+      )
+    const selectedTier =
+      normalizeSelectedDropTier(
+        player.level,
+        this.saveData.account.selectedDropTier
+      )
+
+    this.saveData.account.selectedDropTier =
+      selectedTier
+
+    this.add.rectangle(
+      315,
+      585,
+      558,
+      82,
+      0x10161d
+    ).setStrokeStyle(1, 0x354252)
+
+    this.add.text(50, 550,
+      `HUNTER LEVEL ${player.level}  //  XP ${player.currentXP} / ${player.xpToNextLevel}`,
+      {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '14px',
+        color: '#55d8ee',
+      }
+    )
+
+    this.add.text(50, 575,
+      nextReward
+        ? `NEXT LEVEL ${nextReward.level} // ${getHunterRewardPreview(nextReward)}`
+        : 'NEXT REWARD // MORE REWARDS COMING SOON',
+      {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        color: '#b9c2ca',
+      }
+    )
+
+    this.add.text(50, 597,
+      canEquipArmor(player.level)
+        ? `ARMOR // ${this.saveData.equippedArmor.name.toUpperCase()} // ${this.saveData.equippedArmor.rarity.toUpperCase()} // DEF ${getArmorModifiers(this.saveData.equippedArmor).defense}`
+        : 'ARMOR SLOT // LOCKED',
+      {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '11px',
+        color: canEquipArmor(player.level) ? '#75dba0' : '#777f87',
+      }
+    )
+
+    const progress =
+      this.summary?.hunterProgress
+    if (progress) {
+      const rewards =
+        getHunterRewardSummary(
+          progress.previousLevel,
+          progress.newLevel
+        )
+      const rewardText =
+        getHunterRewardDisplayLines(rewards).join(' // ')
+      this.add.text(50, 619,
+        `LAST DROP // XP +${progress.xpGained} // LEVEL ${progress.previousLevel} > ${progress.newLevel}${rewardText ? ` // ${rewardText}` : ''}`,
+        {
+          fontFamily: 'Courier New, monospace',
+          fontSize: '9px',
+          color: progress.newLevel > progress.previousLevel ? '#ffcc66' : '#78838c',
+          wordWrap: { width: 400 },
+        }
+      )
+    }
+
+    this.add.text(465, 550,
+      `DROP TIER // HIGHEST ${highestTier}`,
+      {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '11px',
+        color: '#ffffff',
+      }
+    )
+
+    this.createTierButton(485, 590, 1, selectedTier, true)
+    this.createTierButton(555, 590, 2, selectedTier, highestTier >= 2)
+  }
+
+  private createTierButton(
+    x: number,
+    y: number,
+    tier: DropTier,
+    selectedTier: DropTier,
+    unlocked: boolean
+  ) {
+    const selected =
+      tier === selectedTier
+    const button =
+      this.add.rectangle(
+        x,
+        y,
+        58,
+        35,
+        selected ? 0x8f1119 : 0x222a33
+      ).setStrokeStyle(
+        1,
+        selected ? 0xffffff : 0x46525e
+      )
+
+    this.add.text(x, y,
+      unlocked ? `TIER ${tier}` : 'LOCKED',
+      {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '10px',
+        color: unlocked ? '#ffffff' : '#666666',
+      }
+    ).setOrigin(0.5)
+
+    if (unlocked) {
+      button.setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          this.saveData.account.selectedDropTier = tier
+          this.statusMessage = `DROP TIER ${tier} SELECTED`
+          this.save()
+          this.render()
+        })
+    }
+
+    if (!unlocked) {
+      this.add.text(520, 616, 'LV 8 REQUIRED', {
+        fontFamily: 'Arial',
+        fontSize: '9px',
+        color: '#696f76',
+      }).setOrigin(0.5)
+    }
   }
 
   private getComparisonLine(
@@ -1287,6 +1551,38 @@ export class HunterBayScene
     )
   }
 
+  private setupArmorDebugControl() {
+    if (!import.meta.env.DEV || !this.input.keyboard) return
+
+    const handler = (event: KeyboardEvent) => {
+      if (
+        event.code !== 'KeyA' ||
+        !event.shiftKey ||
+        !event.ctrlKey
+      ) {
+        return
+      }
+
+      let added = 0
+      for (const armor of createDevelopmentArmorItems()) {
+        if (!this.inventory.getItem(armor.id) && this.inventory.addItem(armor)) {
+          added++
+        }
+      }
+
+      this.statusMessage = added > 0
+        ? `DEV ARMOR ADDED // ${added} TEST SUITS`
+        : 'DEV ARMOR ALREADY PRESENT OR INVENTORY FULL'
+      this.save()
+      this.render()
+    }
+
+    this.input.keyboard.on('keydown', handler)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', handler)
+    })
+  }
+
   private createActionButton(
     x: number,
     y: number,
@@ -1341,6 +1637,9 @@ export class HunterBayScene
       this.inventory.getItems()
     this.saveData.equippedWeapon =
       this.inventory.getEquippedItem()
+    this.saveData.equippedArmor =
+      this.inventory.getEquippedArmor() ??
+      this.saveData.equippedArmor
     this.saveData.core =
       this.core.getCore()
 
@@ -1351,7 +1650,7 @@ export class HunterBayScene
 
   private getRarityColor(
     item:
-      WeaponItem
+      InventoryItem
   ) {
     switch (item.rarity) {
       case 'common':
